@@ -29,14 +29,8 @@ services:
       - "8000:8000"
 
   worker:
-    build:
-      context: ../backend
-    env_file:
-      - ../.env
-    command: ["rq", "worker", "pelicanone", "-u", "${REDIS_URL:-redis://redis:6379/0}"]
-    depends_on:
-      - redis
-      - backend
+   command: ["sh", "-lc", "python -m app.workers.rq"]
+
 
   frontend:
     build:
