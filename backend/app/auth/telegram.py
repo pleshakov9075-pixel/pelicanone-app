@@ -16,7 +16,8 @@ def verify_init_data(init_data: str) -> dict:
 
     data_check_arr = [f"{k}={v}" for k, v in sorted(data.items())]
     data_check_string = "\n".join(data_check_arr)
-    secret_key = hashlib.sha256(settings.telegram_bot_token.encode()).digest()
+
+    secret_key = hmac.new(b"WebAppData", settings.telegram_bot_token.encode(), hashlib.sha256).digest()
     calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
     if calculated_hash != received_hash:
