@@ -12,6 +12,7 @@ from app.db import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 DEV_START_CREDITS = 1000
+TG_START_CREDITS = 10
 
 
 @router.post("/telegram", response_model=AuthOut)
@@ -25,6 +26,12 @@ async def auth_telegram(
 
     repo = UserRepository(session)
     user = await repo.get_or_create("telegram", str(user_info.get("id")))
+    credits = CreditRepository(session)
+    balance = await credits.get_balance(user.id)
+    if balance < TG_START_CREDITS:
+        await credits.create_tx(
+            user.id, delta=TG_START_CREDITS - balance, reason="telegram_start"
+        )
     await session.commit()
 
     token = create_access_token({"user_id": str(user.id), "platform": "telegram"})
