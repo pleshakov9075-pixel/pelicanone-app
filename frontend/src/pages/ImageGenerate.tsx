@@ -1,18 +1,21 @@
 import { useState } from "react";
 import { createJob } from "../api/jobs";
-import { GenerationForm, GenerationPayload } from "../components/GenerationForm";
+import { GenerationForm, GenerationParams } from "../components/GenerationForm";
+import { usePresets } from "../app/presets";
+import type { Preset } from "../api/presets";
 import { NavHandler } from "./types";
 
 export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
+  const { presets, loading, error: presetsError } = usePresets();
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (data: GenerationPayload) => {
+  const handleSubmit = async (preset: Preset, data: GenerationParams) => {
     setError(null);
     try {
       const job = await createJob({
-        type: "image",
+        type: preset.job_type,
         payload: {
-          network_id: "image-default",
+          network_id: preset.network_id,
           params: data
         }
       });
@@ -23,11 +26,23 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
     }
   };
 
+  if (loading) {
+    return <div>Загрузка пресетов...</div>;
+  }
+
+  if (presetsError) {
+    return <div className="text-red-500">{presetsError}</div>;
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Image генерация</h2>
+      <h2 className="text-xl font-semibold">Генерация</h2>
       {error ? <div className="text-red-500">{error}</div> : null}
-      <GenerationForm onSubmit={handleSubmit} />
+      {presets.length === 0 ? (
+        <div>Пресеты не найдены</div>
+      ) : (
+        <GenerationForm presets={presets} onSubmit={handleSubmit} />
+      )}
     </div>
   );
 }

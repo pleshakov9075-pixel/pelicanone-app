@@ -7,7 +7,7 @@ export function Home({ onNavigate }: { onNavigate: NavHandler }) {
       <h1 className="text-2xl font-semibold">PelicanOne 2.0</h1>
       <p>Выберите тип генерации:</p>
       <div className="flex gap-2">
-        <Button onClick={() => onNavigate("generate")}>Image</Button>
+        <Button onClick={() => onNavigate("generate")}>Generate</Button>
         <Button onClick={() => onNavigate("history")}>History</Button>
         <Button onClick={() => onNavigate("balance")}>Balance</Button>
       </div>

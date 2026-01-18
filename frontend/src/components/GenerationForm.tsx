@@ -1,101 +1,212 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { Preset, PresetField } from "../api/presets";
 import { Button } from "./ui/button";
 
-const styles = ["photoreal", "anime", "3d", "sketch"];
+export type GenerationParams = Record<string, string | number | boolean | undefined>;
 
-export type GenerationPayload = {
-  prompt: string;
-  negative_prompt?: string;
-  size: string;
-  steps: number;
-  seed?: number;
-  style: string;
-};
+type FieldValue = string | number | boolean | "";
 
-export function GenerationForm({ onSubmit }: { onSubmit: (data: GenerationPayload) => void }) {
-  const [form, setForm] = useState<GenerationPayload>({
-    prompt: "",
-    negative_prompt: "",
-    size: "1024x1024",
-    steps: 30,
-    seed: undefined,
-    style: styles[0]
+function buildInitialValues(fields: PresetField[]): Record<string, FieldValue> {
+  const values: Record<string, FieldValue> = {};
+  fields.forEach((field) => {
+    if (field.default !== undefined && field.default !== null) {
+      values[field.name] = field.default as FieldValue;
+    } else if (field.type === "boolean") {
+      values[field.name] = false;
+    } else {
+      values[field.name] = "";
+    }
   });
+  return values;
+}
 
-  return (
-    <form
-      className="flex flex-col gap-4 rounded-lg border p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit(form);
-      }}
-    >
-      <label className="flex flex-col gap-2">
-        <span>Prompt</span>
+function isTextAreaField(field: PresetField) {
+  return ["prompt", "text"].includes(field.name);
+}
+
+export function GenerationForm({
+  presets,
+  onSubmit
+}: {
+  presets: Preset[];
+  onSubmit: (preset: Preset, params: GenerationParams) => void;
+}) {
+  const [selectedPresetId, setSelectedPresetId] = useState(presets[0]?.id ?? "");
+  const [values, setValues] = useState<Record<string, FieldValue>>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const selectedPreset = useMemo(
+    () => presets.find((preset) => preset.id === selectedPresetId),
+    [presets, selectedPresetId]
+  );
+
+  useEffect(() => {
+    if (presets.length > 0 && !selectedPresetId) {
+      setSelectedPresetId(presets[0].id);
+    }
+  }, [presets, selectedPresetId]);
+
+  useEffect(() => {
+    if (selectedPreset) {
+      setValues(buildInitialValues(selectedPreset.fields));
+    }
+  }, [selectedPreset]);
+
+  if (!selectedPreset) {
+    return null;
+  }
+
+  const requiredFields = selectedPreset.fields.filter((field) => field.required);
+  const optionalFields = selectedPreset.fields.filter((field) => !field.required);
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const params: GenerationParams = {};
+
+    selectedPreset.fields.forEach((field) => {
+      const value = values[field.name];
+      if (value === "" || value === undefined) {
+        return;
+      }
+      params[field.name] = value as string | number | boolean;
+    });
+
+    onSubmit(selectedPreset, params);
+  };
+
+  const renderField = (field: PresetField) => {
+    const value = values[field.name];
+    const commonProps = {
+      id: field.name,
+      name: field.name,
+      required: field.required,
+      className: "rounded border p-2"
+    };
+
+    if (field.type === "boolean") {
+      return (
+        <label key={field.name} className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(event) =>
+              setValues((current) => ({ ...current, [field.name]: event.target.checked }))
+            }
+          />
+          <span>{field.label}</span>
+        </label>
+      );
+    }
+
+    if (field.enum && field.enum.length > 0) {
+      return (
+        <label key={field.name} className="flex flex-col gap-2">
+          <span>{field.label}</span>
+          <select
+            {...commonProps}
+            value={value === "" ? "" : String(value)}
+            onChange={(event) => {
+              const raw = event.target.value;
+              const parsed = field.type === "number" ? Number(raw) : raw;
+              setValues((current) => ({ ...current, [field.name]: parsed }));
+            }}
+          >
+            {field.enum.map((option) => (
+              <option key={String(option)} value={String(option)}>
+                {String(option)}
+              </option>
+            ))}
+          </select>
+        </label>
+      );
+    }
+
+    if (field.type === "number") {
+      return (
+        <label key={field.name} className="flex flex-col gap-2">
+          <span>{field.label}</span>
+          <input
+            {...commonProps}
+            type="number"
+            step="any"
+            value={typeof value === "number" ? value : ""}
+            onChange={(event) => {
+              const raw = event.target.value;
+              setValues((current) => ({
+                ...current,
+                [field.name]: raw === "" ? "" : Number(raw)
+              }));
+            }}
+          />
+        </label>
+      );
+    }
+
+    if (isTextAreaField(field)) {
+      return (
+        <label key={field.name} className="flex flex-col gap-2">
+          <span>{field.label}</span>
+          <textarea
+            {...commonProps}
+            rows={4}
+            value={value === "" ? "" : String(value)}
+            onChange={(event) =>
+              setValues((current) => ({ ...current, [field.name]: event.target.value }))
+            }
+          />
+        </label>
+      );
+    }
+
+    return (
+      <label key={field.name} className="flex flex-col gap-2">
+        <span>{field.label}</span>
         <input
-          className="rounded border p-2"
-          value={form.prompt}
-          onChange={(event) => setForm({ ...form, prompt: event.target.value })}
-          required
-        />
-      </label>
-      <label className="flex flex-col gap-2">
-        <span>Negative prompt</span>
-        <input
-          className="rounded border p-2"
-          value={form.negative_prompt}
-          onChange={(event) => setForm({ ...form, negative_prompt: event.target.value })}
-        />
-      </label>
-      <label className="flex flex-col gap-2">
-        <span>Size</span>
-        <select
-          className="rounded border p-2"
-          value={form.size}
-          onChange={(event) => setForm({ ...form, size: event.target.value })}
-        >
-          <option value="512x512">512x512</option>
-          <option value="768x768">768x768</option>
-          <option value="1024x1024">1024x1024</option>
-        </select>
-      </label>
-      <label className="flex flex-col gap-2">
-        <span>Steps</span>
-        <input
-          className="rounded border p-2"
-          type="number"
-          min={10}
-          max={80}
-          value={form.steps}
-          onChange={(event) => setForm({ ...form, steps: Number(event.target.value) })}
-        />
-      </label>
-      <label className="flex flex-col gap-2">
-        <span>Seed (optional)</span>
-        <input
-          className="rounded border p-2"
-          type="number"
-          value={form.seed ?? ""}
+          {...commonProps}
+          type="text"
+          value={value === "" ? "" : String(value)}
           onChange={(event) =>
-            setForm({
-              ...form,
-              seed: event.target.value ? Number(event.target.value) : undefined
-            })
+            setValues((current) => ({ ...current, [field.name]: event.target.value }))
           }
         />
       </label>
-      <div className="flex flex-wrap gap-2">
-        {styles.map((style) => (
+    );
+  };
+
+  return (
+    <form className="flex flex-col gap-4 rounded-lg border p-4" onSubmit={handleSubmit}>
+      <label className="flex flex-col gap-2">
+        <span>Preset</span>
+        <select
+          className="rounded border p-2"
+          value={selectedPresetId}
+          onChange={(event) => setSelectedPresetId(event.target.value)}
+        >
+          {presets.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="flex flex-col gap-4">{requiredFields.map(renderField)}</div>
+
+      {optionalFields.length > 0 ? (
+        <div className="flex flex-col gap-3">
           <button
-            key={style}
             type="button"
-            onClick={() => setForm({ ...form, style })}
-            className={`rounded border px-3 py-2 ${form.style === style ? "bg-black text-white" : ""}`}
+            className="text-left text-sm text-blue-600"
+            onClick={() => setShowAdvanced((prev) => !prev)}
           >
-            {style}
+            {showAdvanced ? "Скрыть расширенные настройки" : "Расширенные настройки"}
           </button>
-        ))}
-      </div>
+          {showAdvanced ? (
+            <div className="flex flex-col gap-4">{optionalFields.map(renderField)}</div>
+          ) : null}
+        </div>
+      ) : null}
+
       <Button type="submit">Сгенерировать</Button>
     </form>
   );

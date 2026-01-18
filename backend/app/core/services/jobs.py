@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.presets import normalize_payload
 from app.core.repositories.credits import CreditRepository
 from app.core.repositories.jobs import JobRepository
 from app.core.settings import COST_TABLE
@@ -15,10 +16,11 @@ class JobService:
         return getattr(COST_TABLE, job_type)
 
     async def create_job_with_charge(self, user_id, job_type: str, payload: dict):
+        normalized_payload = normalize_payload(job_type, payload)
         cost = self.compute_cost(job_type)
         balance = await self.credits.get_balance(user_id)
         if balance - cost < 0:
             raise ValueError("insufficient_credits")
-        job = await self.jobs.create_job(user_id, job_type, payload, cost)
+        job = await self.jobs.create_job(user_id, job_type, normalized_payload, cost)
         await self.credits.create_tx(user_id, delta=-cost, reason="job_reserve", job_id=job.id)
         return job
