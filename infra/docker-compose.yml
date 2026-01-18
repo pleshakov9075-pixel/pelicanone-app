@@ -14,8 +14,6 @@ services:
 
   redis:
     image: redis:7
-    ports:
-      - "6379:6379"
 
   backend:
     build:
@@ -29,7 +27,14 @@ services:
       - "8000:8000"
 
   worker:
-   command: ["sh", "-lc", "python -m app.workers.rq"]
+    build:
+      context: ../backend
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+      - redis
+    command: ["sh", "-lc", "python -m app.workers.rq"]
 
 
   frontend:
