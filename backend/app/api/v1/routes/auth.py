@@ -6,6 +6,7 @@ from app.auth.tokens import create_access_token
 from app.auth.vk import verify_launch_params
 from app.core.schemas import AuthOut, TelegramAuthIn, VkAuthIn
 from app.core.repositories.users import UserRepository
+from app.core.settings import get_settings
 from app.db import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -44,4 +45,18 @@ async def auth_vk(payload: VkAuthIn, session: AsyncSession = Depends(get_session
     await session.commit()
 
     token = create_access_token({"user_id": str(user.id), "platform": "vk"})
+    return AuthOut(access_token=token)
+
+
+@router.post("/dev", response_model=AuthOut)
+async def auth_dev(session: AsyncSession = Depends(get_session)):
+    settings = get_settings()
+    if not settings.dev_auth:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+
+    repo = UserRepository(session)
+    user = await repo.get_or_create("web", "dev")
+    await session.commit()
+
+    token = create_access_token({"user_id": str(user.id), "platform": "web"})
     return AuthOut(access_token=token)
