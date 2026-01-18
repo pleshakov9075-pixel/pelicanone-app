@@ -3,6 +3,8 @@ import datetime as dt
 import logging
 import time
 
+import httpx
+
 from app.core.models.job import Job
 from app.core.presets import get_preset_polling_settings
 from app.db import async_session
@@ -57,7 +59,7 @@ async def _execute_with_retry(client: GenApiClient, job_type: str, payload: dict
         if delay:
             time.sleep(delay)
         try:
-            request = _submit_request(client, payload)
+            request = _submit_request(client, job_type, payload)
             request_id = request.get("request_id") or request.get("id")
             if not request_id:
                 raise ValueError("missing_request_id")
@@ -72,6 +74,14 @@ async def _execute_with_retry(client: GenApiClient, job_type: str, payload: dict
             if response.get("status") == "error":
                 raise ValueError(response.get("error", "genapi_error"))
             return response
+        except httpx.HTTPStatusError as exc:
+            response = exc.response
+            logger.error(
+                "GenAPI request failed status_code=%s response=%s",
+                getattr(response, "status_code", None),
+                getattr(response, "text", None),
+            )
+            raise
         except GenApiRetryableError as exc:
             last_error = exc
             if str(exc) == "genapi_timeout":
@@ -80,14 +90,33 @@ async def _execute_with_retry(client: GenApiClient, job_type: str, payload: dict
     raise last_error or RuntimeError("genapi_failed")
 
 
-def _submit_request(client: GenApiClient, payload: dict):
+def _submit_request(client: GenApiClient, job_type: str, payload: dict):
     if "network_id" in payload:
-        return client.submit_network(payload["network_id"], payload.get("params", {}))
+        params = _prepare_network_params(job_type, payload)
+        return client.submit_network(payload["network_id"], params)
     return client.submit_function(
         payload.get("function_id", ""),
         payload.get("implementation", ""),
         payload.get("params", {}),
     )
+
+
+def _prepare_network_params(job_type: str, payload: dict) -> dict:
+    params = payload.get("params") or {}
+    if (
+        job_type == "text"
+        and payload.get("network_id") == "grok-4-1"
+        and "messages" not in params
+        and "prompt" in params
+    ):
+        mapped_params = {
+            "messages": [{"role": "user", "content": params["prompt"]}],
+        }
+        for key in ("temperature", "max_tokens", "translate_input"):
+            if key in params:
+                mapped_params[key] = params[key]
+        return mapped_params
+    return params
 
 
 def _resolve_polling_settings(job_type: str, payload: dict) -> tuple[int, float]:
