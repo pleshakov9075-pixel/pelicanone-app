@@ -24,6 +24,7 @@ export function AppRouter() {
   const [loadingPresets, setLoadingPresets] = useState(true);
   const [presetError, setPresetError] = useState<string | null>(null);
   const Active = routes[route];
+  const isDevMode = localStorage.getItem("dev_mode") === "true";
 
   useEffect(() => {
     getPresets()
@@ -40,12 +41,29 @@ export function AppRouter() {
   return (
     <PresetsContext.Provider value={{ presets, loading: loadingPresets, error: presetError }}>
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 p-6">
-        <header className="flex flex-wrap gap-2">
+        <header className="flex flex-wrap items-center gap-2">
           {Object.keys(routes).map((key) => (
             <Button key={key} onClick={() => setRoute(key as RouteKey)}>
               {key}
             </Button>
           ))}
+          {isDevMode ? (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                DEV MODE
+              </span>
+              <Button
+                onClick={() => {
+                  localStorage.removeItem("auth_token");
+                  localStorage.removeItem("dev_mode");
+                  location.reload();
+                }}
+                type="button"
+              >
+                Logout
+              </Button>
+            </div>
+          ) : null}
         </header>
         <Active onNavigate={setRoute} />
       </div>

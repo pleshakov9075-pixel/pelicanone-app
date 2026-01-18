@@ -82,6 +82,7 @@ function App() {
             apiFetch<{ access_token: string }>("/auth/dev", { method: "POST" })
               .then((data) => {
                 setAuthToken(data.access_token);
+                localStorage.setItem("dev_mode", "true");
                 setAuthState("ready");
               })
               .catch(() => {

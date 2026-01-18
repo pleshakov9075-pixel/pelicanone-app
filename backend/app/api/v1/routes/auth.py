@@ -5,11 +5,13 @@ from app.auth.telegram import verify_init_data
 from app.auth.tokens import create_access_token
 from app.auth.vk import verify_launch_params
 from app.core.schemas import AuthOut, TelegramAuthIn, VkAuthIn
+from app.core.repositories.credits import CreditRepository
 from app.core.repositories.users import UserRepository
 from app.core.settings import get_settings
 from app.db import get_session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+DEV_START_CREDITS = 1000
 
 
 @router.post("/telegram", response_model=AuthOut)
@@ -56,6 +58,12 @@ async def auth_dev(session: AsyncSession = Depends(get_session)):
 
     repo = UserRepository(session)
     user = await repo.get_or_create("web", "dev")
+    credits = CreditRepository(session)
+    balance = await credits.get_balance(user.id)
+    if balance < DEV_START_CREDITS:
+        await credits.create_tx(
+            user.id, delta=DEV_START_CREDITS - balance, reason="dev_auth"
+        )
     await session.commit()
 
     token = create_access_token({"user_id": str(user.id), "platform": "web"})
