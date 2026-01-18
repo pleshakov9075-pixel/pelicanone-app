@@ -8,6 +8,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "Text",
         "job_type": "text",
         "network_id": "grok-4-1",
+        "eta_seconds": 20,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 120,
         "fields": [
             {"name": "prompt", "label": "Prompt", "type": "string", "required": True},
             {
@@ -38,6 +41,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "Image",
         "job_type": "image",
         "network_id": "gpt-image-1-5",
+        "eta_seconds": 180,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 600,
         "fields": [
             {"name": "prompt", "label": "Prompt", "type": "string", "required": True},
             {
@@ -70,6 +76,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "Video",
         "job_type": "video",
         "network_id": "veo-3.1",
+        "eta_seconds": 600,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 1800,
         "fields": [
             {"name": "prompt", "label": "Prompt", "type": "string", "required": True},
             {
@@ -125,6 +134,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "Music",
         "job_type": "audio",
         "network_id": "suno",
+        "eta_seconds": 120,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 1200,
         "fields": [
             {"name": "prompt", "label": "Prompt", "type": "string", "required": True},
             {"name": "title", "label": "Title", "type": "string", "required": True},
@@ -150,6 +162,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "TTS",
         "job_type": "audio",
         "network_id": "tts-eleven-v3",
+        "eta_seconds": 30,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 300,
         "fields": [
             {"name": "text", "label": "Text", "type": "string", "required": True},
             {
@@ -187,6 +202,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "STT",
         "job_type": "audio",
         "network_id": "silero-vad",
+        "eta_seconds": 15,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 180,
         "fields": [
             {"name": "audio_url", "label": "Audio URL", "type": "string", "required": True}
         ],
@@ -196,6 +214,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "Upscale image",
         "job_type": "upscale",
         "network_id": "seedvr",
+        "eta_seconds": 60,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 900,
         "fields": [
             {"name": "image_url", "label": "Image URL", "type": "string", "required": True},
             {
@@ -212,6 +233,9 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "label": "Upscale video",
         "job_type": "upscale",
         "network_id": "seedvr-video",
+        "eta_seconds": 600,
+        "poll_interval_seconds": 2.0,
+        "timeout_seconds": 1800,
         "fields": [
             {"name": "video_url", "label": "Video URL", "type": "string", "required": True},
             {
@@ -235,6 +259,35 @@ def get_preset_by_network_id(network_id: str) -> dict[str, Any] | None:
         if preset["network_id"] == network_id:
             return preset
     return None
+
+
+def get_preset_eta_seconds(payload: dict[str, Any]) -> int | None:
+    if not isinstance(payload, dict):
+        return None
+    network_id = payload.get("network_id")
+    if not network_id:
+        return None
+    preset = get_preset_by_network_id(network_id)
+    if not preset:
+        return None
+    eta_seconds = preset.get("eta_seconds")
+    return int(eta_seconds) if isinstance(eta_seconds, int) else None
+
+
+def get_preset_polling_settings(payload: dict[str, Any]) -> tuple[int | None, float | None]:
+    if not isinstance(payload, dict):
+        return None, None
+    network_id = payload.get("network_id")
+    if not network_id:
+        return None, None
+    preset = get_preset_by_network_id(network_id)
+    if not preset:
+        return None, None
+    timeout_seconds = preset.get("timeout_seconds")
+    poll_interval_seconds = preset.get("poll_interval_seconds")
+    timeout = int(timeout_seconds) if isinstance(timeout_seconds, int) else None
+    interval = float(poll_interval_seconds) if poll_interval_seconds is not None else None
+    return timeout, interval
 
 
 def normalize_payload(job_type: str, payload: dict[str, Any]) -> dict[str, Any]:

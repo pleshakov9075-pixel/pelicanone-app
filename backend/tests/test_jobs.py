@@ -33,7 +33,10 @@ async def test_create_job(client, db_session):
     response = await client.post(
         "/api/v1/jobs",
         headers={"Authorization": f"Bearer {token}"},
-        json={"type": "image", "payload": {"network_id": "test", "params": {"a": 1}}},
+        json={
+            "type": "image",
+            "payload": {"network_id": "gpt-image-1-5", "params": {"prompt": "Hello"}},
+        },
     )
 
     assert response.status_code == 201

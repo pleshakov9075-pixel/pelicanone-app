@@ -24,6 +24,21 @@ function isTextAreaField(field: PresetField) {
   return ["prompt", "text"].includes(field.name);
 }
 
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
+    return "";
+  }
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  if (minutes === 0) {
+    return `${remainingSeconds} сек`;
+  }
+  if (remainingSeconds === 0) {
+    return `${minutes} мин`;
+  }
+  return `${minutes} мин ${remainingSeconds} сек`;
+}
+
 export function GenerationForm({
   presets,
   onSubmit
@@ -58,6 +73,9 @@ export function GenerationForm({
 
   const requiredFields = selectedPreset.fields.filter((field) => field.required);
   const optionalFields = selectedPreset.fields.filter((field) => !field.required);
+  const etaLabel = selectedPreset.eta_seconds
+    ? `Ожидание ~ ${formatDuration(selectedPreset.eta_seconds)}`
+    : null;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -207,7 +225,10 @@ export function GenerationForm({
         </div>
       ) : null}
 
-      <Button type="submit">Сгенерировать</Button>
+      <div className="flex flex-col gap-2">
+        <Button type="submit">Сгенерировать</Button>
+        {etaLabel ? <span className="text-xs text-slate-500">{etaLabel}</span> : null}
+      </div>
     </form>
   );
 }

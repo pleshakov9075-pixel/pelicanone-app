@@ -1,3 +1,4 @@
+import datetime as dt
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,5 +71,6 @@ async def cancel_job(
     if job.status not in {"queued", "running"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_cancel")
     job.status = "canceled"
+    job.finished_at = dt.datetime.utcnow()
     await session.commit()
     return job
