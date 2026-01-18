@@ -27,7 +27,10 @@ class GenApiClient:
         return self._post(f"/functions/{function_id}", payload, files)
 
     def poll(self, request_id: str) -> dict:
-        response = self._client.get(f"/request/get/{request_id}")
+        try:
+            response = self._client.get(f"/request/get/{request_id}")
+        except httpx.HTTPError as exc:
+            raise GenApiRetryableError("network_error") from exc
         if response.status_code in {429, 500, 502, 503}:
             raise GenApiRetryableError("retryable_status")
         response.raise_for_status()
@@ -44,12 +47,17 @@ class GenApiClient:
         return response.json()
 
     def poll_until_done(self, request_id: str, timeout_s: int = 120, interval_s: float = 2.0) -> dict:
-        started = time.time()
+        started = time.monotonic()
+        attempts = 0
+        success_statuses = {"done", "success", "succeeded", "completed"}
+        error_statuses = {"error", "failed", "canceled", "cancelled"}
         while True:
-            if time.time() - started > timeout_s:
-                raise TimeoutError("genapi_timeout")
+            if time.monotonic() - started > timeout_s:
+                raise GenApiRetryableError("genapi_timeout")
             data = self.poll(request_id)
-            status = data.get("status")
-            if status in {"done", "error"}:
+            status = str(data.get("status", "")).lower()
+            if status in success_statuses or status in error_statuses:
                 return data
-            time.sleep(interval_s)
+            sleep_interval = min(interval_s * (1 + attempts * 0.1), interval_s * 5)
+            attempts += 1
+            time.sleep(sleep_interval)

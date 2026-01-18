@@ -8,6 +8,10 @@ export type Job = {
   payload: Record<string, unknown>;
   result?: Record<string, unknown> | null;
   cost: number;
+  eta_seconds?: number | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  queue_position?: number | null;
 };
 
 export async function createJob(payload: { type: string; payload: Record<string, unknown> }) {
