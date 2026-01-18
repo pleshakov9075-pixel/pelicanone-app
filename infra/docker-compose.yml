@@ -37,23 +37,25 @@ services:
     command: ["sh", "-lc", "python -m app.workers.rq"]
 
 
-  frontend:
+  frontend-build:
     build:
       context: ../frontend
-    environment:
-      - VITE_API_URL=/api
-    ports:
-      - "5173:5173"
+      target: build
+    command: ["sh", "-c", "mkdir -p /dist && rm -rf /dist/* && cp -r /app/dist/. /dist"]
+    volumes:
+      - frontend_dist:/dist
 
   nginx:
     image: nginx:1.25
     depends_on:
       - backend
-      - frontend
+      - frontend-build
     ports:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - frontend_dist:/usr/share/nginx/html:ro
 
 volumes:
   db_data:
+  frontend_dist:
