@@ -32,7 +32,9 @@ function App() {
         setAuthState("error");
         return;
       }
-      window.Telegram?.WebApp?.expand?.();
+      const tg = window.Telegram?.WebApp;
+      tg?.ready?.();
+      tg?.expand?.();
       apiFetch<{ access_token: string }>("/auth/telegram", {
         method: "POST",
         body: JSON.stringify({ initData })

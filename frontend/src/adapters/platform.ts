@@ -2,7 +2,6 @@ export type Platform = "telegram" | "vk" | "web";
 
 declare global {
   interface Window {
-    Telegram?: { WebApp?: { initData?: string } };
     VKBridge?: unknown;
   }
 }

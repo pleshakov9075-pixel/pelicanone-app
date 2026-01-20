@@ -39,6 +39,17 @@ curl -s https://ai.pelicanstudio.ru/api/v1/health
 - `https://ai.pelicanstudio.ru/.env` возвращает `404`.
 - `https://ai.pelicanstudio.ru/media/` возвращает `404`.
 
+## Frontend build checks
+
+```bash
+cd /opt/pelicanone-app/frontend
+npm ci
+npm run build
+
+cd /opt/pelicanone-app/infra
+docker compose build nginx
+```
+
 ## Критерии приёмки
 
 - `ss -ltnp | grep -E ':80|:443'` — оба порта слушаются.
