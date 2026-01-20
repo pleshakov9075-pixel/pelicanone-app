@@ -11,9 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
     image: redis:7
+    restart: unless-stopped
 
   backend:
     build:
@@ -25,6 +27,7 @@ services:
       - redis
     ports:
       - "8000:8000"
+    restart: unless-stopped
 
   worker:
     build:
@@ -35,7 +38,7 @@ services:
       - db
       - redis
     command: ["sh", "-lc", "python -m app.workers.rq"]
-
+    restart: unless-stopped
 
   nginx:
     build:
@@ -45,20 +48,12 @@ services:
       - backend
     environment:
       VITE_API_URL: /api
-
-  caddy:
-    image: caddy:2
-    depends_on:
-      - nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    restart: unless-stopped
 
 volumes:
   db_data:
-  caddy_data:
-  caddy_config:
