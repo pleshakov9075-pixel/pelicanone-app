@@ -1,4 +1,9 @@
-import { apiFetch, API_BASE, buildApiHeaders } from "./client";
+import {
+  apiFetch,
+  API_BASE,
+  buildApiHeaders,
+  getTelegramInitDataHeader
+} from "./client";
 
 export type Job = {
   id: string;
@@ -51,6 +56,9 @@ export async function createJob(payload: { type: string; payload: Record<string,
 }
 
 export async function getJobDetail(id: string): Promise<JobDetailResponse> {
+  if (!getTelegramInitDataHeader()) {
+    return { ok: false, statusCode: 401, error: "telegram_initdata_missing" };
+  }
   const headers = buildApiHeaders();
   const response = await fetch(`${API_BASE}/jobs/${id}`, { headers });
   const text = await response.text();
@@ -69,6 +77,9 @@ export async function listJobs() {
 }
 
 export async function getJobResult(id: string): Promise<JobResultResponse> {
+  if (!getTelegramInitDataHeader()) {
+    return { status: "failed", error: "telegram_initdata_missing", httpStatus: 401 };
+  }
   const headers = buildApiHeaders();
   const response = await fetch(`${API_BASE}/jobs/${id}/result`, { headers });
   const text = await response.text();

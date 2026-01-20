@@ -6,6 +6,6 @@ export async function getBalance() {
 
 export async function listCreditTx() {
   return apiFetch<{ items: Array<{ id: string; delta: number; reason: string }>; total: number }>(
-    "/credits/tx"
+    "/credits/ledger"
   );
 }

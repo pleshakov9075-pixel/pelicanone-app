@@ -8,6 +8,7 @@ import httpx
 from app.core.models.job import Job
 from app.core.media import cleanup_media_files, persist_result_files
 from app.core.presets import get_preset_polling_settings
+from app.core.repositories.credits import CreditRepository
 from app.core.settings import get_settings
 from app.db import async_session
 from app.providers.genapi.client import GenApiClient
@@ -61,6 +62,14 @@ async def _run_job_async(job_id: str) -> dict:
             if job.status in {"done", "failed"}:
                 job.finished_at = dt.datetime.utcnow()
             await session.commit()
+            if job.status == "failed" and job.cost:
+                credits = CreditRepository(session)
+                refunded = await credits.has_job_reason(job.id, "job_refund")
+                if not refunded:
+                    await credits.create_tx(
+                        job.user_id, delta=job.cost, reason="job_refund", job_id=job.id
+                    )
+                    await session.commit()
         if error:
             raise error
         return result_payload or _build_empty_result(job.type)

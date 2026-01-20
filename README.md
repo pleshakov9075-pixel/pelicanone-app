@@ -1,6 +1,6 @@
 # PelicanOne 2.0 Monorepo
 
-Единый репозиторий для backend (FastAPI) и frontend (React/Vite) с поддержкой Telegram WebApp, VK Mini Apps и Web.
+Единый репозиторий для backend (FastAPI) и frontend (React/Vite) с поддержкой Telegram WebApp.
 
 ## Структура
 
@@ -41,12 +41,11 @@ docker compose -f infra/docker-compose.yml up -d --build
 docker compose -f infra/docker-compose.yml logs -f worker
 ```
 
-## Настройка Telegram/VK
+## Настройка Telegram
 
-- Telegram: установите `TELEGRAM_BOT_TOKEN` в `.env`.
-- VK: установите `VK_APP_SECRET` в `.env`.
+- Установите `TELEGRAM_BOT_TOKEN` в `.env`.
 
-Auth для Web режима отсутствует: авторизация осуществляется через Telegram/VK init data.
+Auth для Web режима отсутствует: авторизация осуществляется только через Telegram init data.
 
 ### Авторизация Telegram WebApp
 
@@ -54,24 +53,28 @@ Auth для Web режима отсутствует: авторизация ос
 - Если заголовок отсутствует, backend вернёт `401 telegram_initdata_missing`.
 - Если initData невалиден, backend вернёт `401 telegram_initdata_invalid`.
 
-#### DEV bypass (только для разработки)
-
-Включите, чтобы отлаживать API в обычном браузере без Telegram:
-
-```
-DEV_AUTH_BYPASS=true
-DEV_USER_PLATFORM_USER_ID=dev
-DEV_USER_ID=
-```
-
-> ⚠️ Используйте только в dev окружении.
-
-Для фронтенда можно включить `VITE_DEV_AUTH_BYPASS=true`, чтобы UI не блокировал отправку запросов без initData.
-
 ## Credits
 
 - 1 кредит = 1 рубль.
 - Пополнение: `/api/v1/billing/topup` (мок, `reason=topup_mock`).
+
+### Пополнение через CLI (админ)
+
+```bash
+docker compose -f infra/docker-compose.yml exec backend \
+  python -m app.cli.credits topup --telegram-id 123456 --amount 300 --reason "manual topup"
+```
+
+Если задано `ADMIN_TELEGRAM_IDS=123,456`, то добавьте `--admin-id` из списка.
+
+### Проверка баланса
+
+- Через MiniApp (раздел «Баланс»).
+- Через API в окружении Telegram:
+
+```bash
+curl -H "X-Telegram-InitData: <initData>" http://localhost/api/v1/credits/balance
+```
 
 ## GenAPI
 

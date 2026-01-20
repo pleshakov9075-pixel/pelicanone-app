@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  DEV_AUTH_BYPASS_ENABLED,
-  getAuthToken,
-  hasTelegramInitData,
-  notifyMissingTelegramInitData
-} from "../api/client";
+import { hasTelegramInitData } from "../api/client";
 import { createJob } from "../api/jobs";
 import { GenerationForm, GenerationParams } from "../components/GenerationForm";
 import { usePresets } from "../app/presets";
@@ -26,10 +21,7 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
   }, []);
 
   const handleSubmit = async (preset: Preset, data: GenerationParams) => {
-    const hasInitData = hasTelegramInitData();
-    const hasAuthToken = Boolean(getAuthToken());
-    if (!hasInitData && !DEV_AUTH_BYPASS_ENABLED && !hasAuthToken) {
-      notifyMissingTelegramInitData();
+    if (!hasTelegramInitData()) {
       setError(ru.messages.telegramInitDataMissing);
       setPhase("idle");
       return;
@@ -50,7 +42,14 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
       onNavigate("job", { jobId: job.id });
       setPhase("idle");
     } catch (err) {
-      setError(ru.errors.generationFailed);
+      const message = err instanceof Error ? err.message : "";
+      if (message === "insufficient_funds") {
+        setError(ru.errors.insufficientFunds);
+      } else if (message === "telegram_initdata_missing") {
+        setError(ru.messages.telegramInitDataMissing);
+      } else {
+        setError(ru.errors.generationFailed);
+      }
       setPhase("failed");
     }
   };

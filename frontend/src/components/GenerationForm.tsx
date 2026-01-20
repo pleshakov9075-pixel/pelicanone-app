@@ -86,6 +86,7 @@ export function GenerationForm({
   const showIdleEstimate = phase === "idle" && idleEtaSeconds;
   const remainingSeconds =
     displayEtaSeconds && elapsedSeconds > 0 ? Math.max(displayEtaSeconds - elapsedSeconds, 0) : 0;
+  const priceRub = selectedPreset.price_rub;
 
   const currentParams = useMemo(() => {
     const params: GenerationParams = {};
@@ -302,6 +303,9 @@ export function GenerationForm({
             )}
           </span>
         ) : null}
+        <span className="text-xs text-slate-500">
+          {ru.labels.price}: {priceRub} ₽
+        </span>
       </div>
     </form>
   );
