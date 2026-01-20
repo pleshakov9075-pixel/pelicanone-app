@@ -7,6 +7,7 @@ import {
 } from "../api/jobs";
 import { NavHandler } from "./types";
 import { ResultPanel } from "../components/ResultPanel";
+import { formatStatus, ru } from "../i18n/ru";
 
 export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
   const devEnabled = import.meta.env.VITE_DEV_AUTH === "true";
@@ -16,11 +17,12 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
   const [error, setError] = useState<string | null>(null);
   const [resultError, setResultError] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [isResultPolling, setIsResultPolling] = useState(false);
 
   useEffect(() => {
     const storedJobId = localStorage.getItem("last_job_id");
     if (!storedJobId) {
-      setError("Job not found");
+      setError(ru.messages.jobNotFound);
       return;
     }
     setJobId(storedJobId);
@@ -38,7 +40,7 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
         const response = await getJobStatus(jobId);
         if (!response.ok) {
           if (response.statusCode === 404) {
-            setError("Задача не найдена");
+            setError(ru.messages.jobNotFound);
             setIsPolling(false);
             if (timer) {
               window.clearInterval(timer);
@@ -60,7 +62,7 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
           setIsPolling(false);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "error");
+        setError(ru.errors.generationFailed);
         setIsPolling(false);
       }
     };
@@ -82,34 +84,74 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
     if (!["finished", "failed"].includes(jobStatus.status)) {
       return;
     }
+    let timer: number | undefined;
+    let timeoutTimer: number | undefined;
+    const startedPollingAt = Date.now();
     const fetchResult = async () => {
       const result = await getJobResult(jobId);
       if (result.httpStatus === 404) {
-        setError("Задача не найдена");
+        setError(ru.messages.jobNotFound);
+        setIsResultPolling(false);
         return;
       }
       const payload = result.result as JobResultPayload | undefined;
       if (payload) {
         setJobResult(payload);
         localStorage.setItem("last_job_result", JSON.stringify(payload));
+        setIsResultPolling(false);
+        if (timer) {
+          window.clearInterval(timer);
+        }
+        if (timeoutTimer) {
+          window.clearTimeout(timeoutTimer);
+        }
+        return;
       }
       if (result.error) {
-        setResultError(result.error);
+        setResultError(ru.errors.generationFailed);
+      }
+      if (Date.now() - startedPollingAt >= 120 * 1000) {
+        setIsResultPolling(false);
+        setResultError(ru.messages.jobTimeout);
       }
     };
-    fetchResult().catch((err) => {
-      setResultError(err instanceof Error ? err.message : "error");
+
+    setIsResultPolling(true);
+    fetchResult().catch(() => {
+      setResultError(ru.errors.generationFailed);
+      setIsResultPolling(false);
     });
+    timer = window.setInterval(fetchResult, 1500);
+    timeoutTimer = window.setTimeout(() => {
+      setIsResultPolling(false);
+      setResultError(ru.messages.jobTimeout);
+      if (timer) {
+        window.clearInterval(timer);
+      }
+    }, 120 * 1000);
+
+    return () => {
+      if (timer) {
+        window.clearInterval(timer);
+      }
+      if (timeoutTimer) {
+        window.clearTimeout(timeoutTimer);
+      }
+    };
   }, [jobId, jobResult, jobStatus]);
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Статус задачи</h2>
+      <h2 className="text-xl font-semibold">{ru.titles.status}</h2>
       {error ? <div className="text-red-500">{error}</div> : null}
       {jobId && jobStatus ? (
         <div className="rounded-lg border p-4">
-          <div>ID: {jobId}</div>
-          <div>Статус: {jobStatus.status}</div>
+          <div>
+            {ru.labels.id}: {jobId}
+          </div>
+          <div>
+            {ru.labels.status}: {formatStatus(jobStatus.status)}
+          </div>
           {jobStatus.error ? <div className="mt-2 text-red-500">{jobStatus.error}</div> : null}
         </div>
       ) : null}
@@ -117,14 +159,16 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
         status={jobStatus?.status}
         result={jobResult}
         error={resultError}
-        isLoading={isPolling}
+        isLoading={isPolling || isResultPolling}
         debug={
           jobResult?.raw && devEnabled && localStorage.getItem("dev_mode") === "true"
             ? jobResult.raw
             : null
         }
       />
-      <button className="text-blue-600" onClick={() => onNavigate("history")}>К истории</button>
+      <button className="text-blue-600" onClick={() => onNavigate("history")}>
+        {ru.actions.toHistory}
+      </button>
     </div>
   );
 }

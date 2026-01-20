@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { JobResultPayload, ResultItem } from "../api/jobs";
 import { Button } from "./ui/button";
+import { formatStatus, ru } from "../i18n/ru";
 
 type ResultPanelProps = {
   status?: string | null;
@@ -26,25 +27,44 @@ export function ResultPanel({ status, result, error, debug, isLoading }: ResultP
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const textItem = useMemo(() => (result ? pickText(result.items) : undefined), [result]);
   const fileItem = useMemo(() => (result ? pickFile(result.items) : undefined), [result]);
+  const fileUrl = fileItem?.url;
+  const isExternalLink = useMemo(() => {
+    if (!fileUrl) {
+      return false;
+    }
+    if (fileUrl.startsWith("/media/")) {
+      return false;
+    }
+    try {
+      const parsed = new URL(fileUrl, window.location.origin);
+      return parsed.origin !== window.location.origin;
+    } catch {
+      return false;
+    }
+  }, [fileUrl]);
 
   const handleCopy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      setCopyStatus("Скопировано!");
+      setCopyStatus(ru.errors.copySuccess);
       setTimeout(() => setCopyStatus(null), 1500);
     } catch {
-      setCopyStatus("Не удалось скопировать");
+      setCopyStatus(ru.errors.copyFailed);
     }
   };
 
   return (
     <div className="flex h-full flex-col gap-4 rounded-lg border p-4">
       <div className="flex items-center justify-between">
-        <div className="text-base font-semibold">Результат</div>
-        {status ? <div className="text-xs text-slate-500">Статус: {status}</div> : null}
+        <div className="text-base font-semibold">{ru.titles.result}</div>
+        {status ? (
+          <div className="text-xs text-slate-500">
+            {ru.labels.status}: {formatStatus(status)}
+          </div>
+        ) : null}
       </div>
 
-      {isLoading ? <div className="text-sm text-slate-500">Генерация в процессе...</div> : null}
+      {isLoading ? <div className="text-sm text-slate-500">{ru.messages.generating}</div> : null}
       {error ? <div className="text-sm text-red-500">{error}</div> : null}
 
       {textItem?.text ? (
@@ -57,7 +77,7 @@ export function ResultPanel({ status, result, error, debug, isLoading }: ResultP
           />
           <div className="flex flex-wrap gap-2 text-sm">
             <Button type="button" onClick={() => handleCopy(textItem.text)}>
-              Copy
+              {ru.actions.copy}
             </Button>
             {copyStatus ? <span className="text-xs text-slate-500">{copyStatus}</span> : null}
           </div>
@@ -70,7 +90,7 @@ export function ResultPanel({ status, result, error, debug, isLoading }: ResultP
             <img
               className="max-h-80 w-full rounded border object-contain"
               src={fileItem.url}
-              alt={fileItem.filename ?? "result"}
+              alt={fileItem.filename ?? ru.titles.result}
             />
           ) : null}
           {result?.type === "video" ? (
@@ -86,30 +106,33 @@ export function ResultPanel({ status, result, error, debug, isLoading }: ResultP
               target="_blank"
               rel="noreferrer"
             >
-              Открыть
+              {ru.actions.open}
             </a>
             <a
               className="inline-flex items-center rounded border px-3 py-1 text-sm"
               href={fileItem.url}
-              download={fileItem.filename ?? "result"}
+              download={fileItem.filename ?? ru.titles.result}
             >
-              Скачать
+              {ru.actions.download}
             </a>
             <Button type="button" onClick={() => handleCopy(fileItem.url)}>
-              Копировать ссылку
+              {ru.actions.copyLink}
             </Button>
             {copyStatus ? <span className="text-xs text-slate-500">{copyStatus}</span> : null}
+            {isExternalLink ? (
+              <span className="text-xs text-amber-600">{ru.labels.externalLink}</span>
+            ) : null}
           </div>
         </div>
       ) : null}
 
       {!textItem && !fileItem && !isLoading && !error ? (
-        <div className="text-sm text-slate-500">Результат появится после завершения генерации.</div>
+        <div className="text-sm text-slate-500">{ru.messages.resultPending}</div>
       ) : null}
 
       {debug ? (
         <details className="text-xs text-slate-500">
-          <summary className="cursor-pointer">Raw debug</summary>
+          <summary className="cursor-pointer">{ru.actions.rawDebug}</summary>
           <pre className="mt-2 whitespace-pre-wrap">{JSON.stringify(debug, null, 2)}</pre>
         </details>
       ) : null}
