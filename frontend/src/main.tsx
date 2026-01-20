@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AppRouter } from "./app/router";
 import { queryClient } from "./app/queryClient";
-import { getTelegramInitData } from "./adapters/telegram";
+import { getTelegramInitData, getTelegramWebApp, hasTelegramWebApp } from "./adapters/telegram";
 import { ru } from "./i18n/ru";
 import "./styles/index.css";
 
@@ -11,8 +11,13 @@ function App() {
   const [authState, setAuthState] = useState<"loading" | "ready" | "missing">("loading");
 
   useEffect(() => {
-    window.Telegram?.WebApp?.ready?.();
-    window.Telegram?.WebApp?.expand?.();
+    if (!hasTelegramWebApp()) {
+      setAuthState("missing");
+      return;
+    }
+    const tg = getTelegramWebApp();
+    tg?.ready?.();
+    tg?.expand?.();
 
     const initData = getTelegramInitData();
     setAuthState(initData ? "ready" : "missing");

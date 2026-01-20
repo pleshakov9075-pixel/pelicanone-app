@@ -18,7 +18,10 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
 
     telegram_bot_token: str = Field(default="", validation_alias="TELEGRAM_BOT_TOKEN")
-    admin_telegram_ids: str = Field(default="", validation_alias="ADMIN_TELEGRAM_IDS")
+    telegram_initdata_ttl_seconds: int = Field(
+        default=60 * 60 * 24, validation_alias="TELEGRAM_INITDATA_TTL_SECONDS"
+    )
+    admin_tg_ids: str = Field(default="", validation_alias="ADMIN_TG_IDS")
 
     genapi_base_url: str = Field(
         default="https://api.gen-api.ru/api/v1", validation_alias="GENAPI_BASE_URL"
@@ -41,6 +44,9 @@ class Settings(BaseSettings):
     price_edit_rub: int = Field(default=8, validation_alias="PRICE_EDIT_RUB")
 
     credit_topup_packages: list[int] = [100, 300, 500]
+
+    def parsed_admin_tg_ids(self) -> set[str]:
+        return {item.strip() for item in self.admin_tg_ids.split(",") if item.strip()}
 
 
 @lru_cache

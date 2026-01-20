@@ -15,7 +15,7 @@ def _parse_admin_ids(raw: str) -> set[str]:
 async def _topup(telegram_id: str, amount: int, reason: str) -> int:
     async with async_session() as session:
         users = UserRepository(session)
-        user = await users.get_or_create("telegram", telegram_id)
+        user, _ = await users.get_or_create_from_telegram({"id": telegram_id})
         credits = CreditRepository(session)
         await credits.create_tx(user.id, delta=amount, reason=reason)
         await session.commit()
@@ -23,7 +23,7 @@ async def _topup(telegram_id: str, amount: int, reason: str) -> int:
 
 
 def _run_topup(args: argparse.Namespace) -> int:
-    admin_ids = _parse_admin_ids(os.environ.get("ADMIN_TELEGRAM_IDS", ""))
+    admin_ids = _parse_admin_ids(os.environ.get("ADMIN_TG_IDS", ""))
     if admin_ids:
         if not args.admin_id or args.admin_id not in admin_ids:
             print("admin_id_not_allowed", file=sys.stderr)
