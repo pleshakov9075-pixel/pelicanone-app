@@ -8,6 +8,30 @@ docker compose down
 docker compose up -d --build
 ```
 
+## Dev reset
+
+Проект в стадии разработки, поэтому при локальном сбросе окружения используем:
+
+```bash
+docker compose down -v
+```
+
+## Production: Alembic stamp + manual migration (опционально)
+
+Если в продакшене есть `alembic_version`, которого нет в репозитории, можно:
+
+1. Подготовить “bridge migration” в репозитории (пустая миграция с нужным
+   revision id и корректным `down_revision`).
+2. На сервере выполнить:
+
+```bash
+alembic stamp <known_revision>
+alembic upgrade head
+```
+
+3. При необходимости выполнить ручные изменения схемы (например, добавить
+   отсутствующие поля в `jobs`) и зафиксировать их следующей миграцией.
+
 ## ENV
 
 Обязательные переменные:
