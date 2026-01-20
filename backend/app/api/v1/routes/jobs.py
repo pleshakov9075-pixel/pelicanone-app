@@ -2,46 +2,16 @@ import datetime as dt
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from redis import Redis
-from rq.job import Job, NoSuchJobError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, get_rq_queue
 from app.core.repositories.jobs import JobRepository
-from app.core.schemas import JobCreate, JobList, JobOut, JobResultOut, JobStatusOut
+from app.core.schemas import JobCreate, JobDetailOut, JobList, JobResultOut, JobSummaryOut
 from app.core.services.jobs import JobService
-from app.core.settings import get_settings
 from app.db import get_session
 from app.workers.tasks import run_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
-settings = get_settings()
-
-
-def _get_rq_job(job_id: str) -> Job:
-    redis = Redis.from_url(settings.redis_url)
-    return Job.fetch(job_id, connection=redis)
-
-
-def _map_rq_status(status_name: str) -> str:
-    return {
-        "queued": "queued",
-        "started": "started",
-        "finished": "finished",
-        "failed": "failed",
-        "deferred": "queued",
-        "scheduled": "queued",
-    }.get(status_name, status_name)
-
-
-def _map_db_status(status_name: str) -> str:
-    return {
-        "queued": "queued",
-        "running": "started",
-        "succeeded": "finished",
-        "failed": "failed",
-        "canceled": "failed",
-    }.get(status_name, status_name)
 
 
 async def _ensure_job_owner(job_id: uuid.UUID, user_id: uuid.UUID, session: AsyncSession) -> None:
@@ -51,7 +21,7 @@ async def _ensure_job_owner(job_id: uuid.UUID, user_id: uuid.UUID, session: Asyn
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
 
 
-@router.post("", response_model=JobOut, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=JobDetailOut, status_code=status.HTTP_201_CREATED)
 async def create_job(
     payload: JobCreate,
     user=Depends(get_current_user),
@@ -67,10 +37,10 @@ async def create_job(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     queue.enqueue(run_job, str(job.id), result_ttl=86400)
-    return job
+    return JobDetailOut.model_validate(job, from_attributes=True)
 
 
-@router.get("/{job_id}", response_model=JobStatusOut)
+@router.get("/{job_id}", response_model=JobDetailOut)
 async def get_job(
     job_id: uuid.UUID,
     user=Depends(get_current_user),
@@ -80,17 +50,10 @@ async def get_job(
     job = await repo.get_job(job_id)
     if not job or job.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
-    try:
-        rq_job = _get_rq_job(str(job_id))
-    except NoSuchJobError:
-        status_name = _map_db_status(job.status)
-        error = None
-        result = job.result if status_name == "finished" else None
-        return JobStatusOut(status=status_name, error=error, result=result, progress=None)
-    status_name = _map_rq_status(rq_job.get_status())
-    error = rq_job.exc_info if status_name == "failed" else None
-    result = job.result if status_name == "finished" else None
-    return JobStatusOut(status=status_name, error=error, result=result, progress=None)
+    payload = JobDetailOut.model_validate(job, from_attributes=True)
+    if payload.status != "done":
+        payload.result = None
+    return payload
 
 
 @router.get("/{job_id}/result", response_model=JobResultOut)
@@ -104,32 +67,19 @@ async def get_job_result(
     job = await repo.get_job(job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
-    try:
-        rq_job = _get_rq_job(str(job_id))
-        status_name = _map_rq_status(rq_job.get_status())
-        rq_error = rq_job.exc_info
-        rq_result = rq_job.result
-    except NoSuchJobError:
-        status_name = _map_db_status(job.status)
-        rq_error = None
-        rq_result = job.result
-    if status_name == "failed":
-        error_detail = None
-        if isinstance(rq_result, dict):
-            error_detail = rq_result.get("error")
-        error_detail = error_detail or rq_error
+    if job.status == "failed":
+        return JobResultOut(status="failed", error=job.error)
+    if job.status != "done":
         return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"status": "failed", "error": error_detail},
+            status_code=status.HTTP_202_ACCEPTED,
+            content=JobResultOut(status=job.status).model_dump(),
         )
-    if status_name != "finished":
-        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": status_name})
-    return JobResultOut(status="finished", result=rq_result)
+    return JobResultOut(status="done", result=job.result)
 
 
 @router.get("", response_model=JobList)
 async def list_jobs(
-    mine: int = 1,
+    mine: bool = True,
     limit: int = 20,
     offset: int = 0,
     user=Depends(get_current_user),
@@ -137,10 +87,11 @@ async def list_jobs(
 ):
     repo = JobRepository(session)
     items, total = await repo.list_jobs(user.id, limit, offset)
-    return JobList(items=items, total=total)
+    summaries = [JobSummaryOut.model_validate(item, from_attributes=True) for item in items]
+    return JobList(items=summaries, total=total)
 
 
-@router.post("/{job_id}/cancel", response_model=JobOut)
+@router.post("/{job_id}/cancel", response_model=JobDetailOut)
 async def cancel_job(
     job_id: uuid.UUID,
     user=Depends(get_current_user),
@@ -152,7 +103,8 @@ async def cancel_job(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
     if job.status not in {"queued", "running"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_cancel")
-    job.status = "canceled"
+    job.status = "failed"
+    job.error = "canceled"
     job.finished_at = dt.datetime.utcnow()
     await session.commit()
-    return job
+    return JobDetailOut.model_validate(job, from_attributes=True)

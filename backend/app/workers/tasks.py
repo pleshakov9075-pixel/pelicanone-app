@@ -28,39 +28,42 @@ DEFAULT_TIMEOUTS = {
 logger = logging.getLogger(__name__)
 
 
-def run_job(job_id: str) -> dict | None:
+def run_job(job_id: str) -> dict:
     return asyncio.run(_run_job_async(job_id))
 
 
-async def _run_job_async(job_id: str) -> dict | None:
+async def _run_job_async(job_id: str) -> dict:
     async with async_session() as session:
         job = await session.get(Job, job_id)
-        if not job or job.status in {"canceled", "succeeded", "failed"}:
-            return
+        if not job or job.status in {"done", "failed"}:
+            return _build_empty_result(job.type if job else "text")
         job.status = "running"
         job.started_at = dt.datetime.utcnow()
         await session.commit()
 
         client = GenApiClient()
-        result_payload = None
+        result_payload: dict | None = None
         error: Exception | None = None
         try:
             result = await _execute_with_retry(client, job.type, job.payload)
-            job.status = "succeeded"
+            job.status = "done"
             result_payload = normalize_result(result, job.type)
             result_payload = await persist_result_files(result_payload)
             job.result = result_payload
+            job.error = None
         except Exception as exc:  # pragma: no cover - fallback for unknown errors
             job.status = "failed"
-            job.result = {"error": str(exc)}
+            job.error = str(exc)
+            result_payload = _build_error_result(job.type, str(exc))
+            job.result = result_payload
             error = exc
         finally:
-            if job.status in {"succeeded", "failed", "canceled"}:
+            if job.status in {"done", "failed"}:
                 job.finished_at = dt.datetime.utcnow()
             await session.commit()
         if error:
             raise error
-        return result_payload
+        return result_payload or _build_empty_result(job.type)
 
 
 async def _execute_with_retry(client: GenApiClient, job_type: str, payload: dict):
@@ -153,3 +156,28 @@ def _fallback_timeout(job_type: str, payload: dict) -> int:
 
 def cleanup_media() -> dict[str, int]:
     return cleanup_media_files()
+
+
+def _build_empty_result(job_type: str) -> dict:
+    normalized_type = _normalize_result_type(job_type)
+    return {
+        "type": normalized_type,
+        "items": [{"kind": "text", "text": "", "content_type": "text/plain"}],
+        "raw": {},
+    }
+
+
+def _build_error_result(job_type: str, message: str) -> dict:
+    normalized_type = _normalize_result_type(job_type)
+    return {
+        "type": normalized_type,
+        "items": [{"kind": "text", "text": "", "content_type": "text/plain"}],
+        "raw": {"error": message},
+    }
+
+
+def _normalize_result_type(job_type: str) -> str:
+    mapped = {"upscale": "image", "edit": "image"}.get(job_type, job_type)
+    if mapped not in {"text", "image", "video", "audio"}:
+        return "text"
+    return mapped

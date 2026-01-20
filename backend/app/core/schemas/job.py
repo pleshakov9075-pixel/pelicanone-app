@@ -1,10 +1,9 @@
 import datetime as dt
 import uuid
 from typing import Any
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field
 
 from app.core.models.job import JOB_STATUSES, JOB_TYPES
-from app.core.presets import get_preset_eta_seconds
 
 
 class JobCreate(BaseModel):
@@ -12,40 +11,36 @@ class JobCreate(BaseModel):
     payload: dict[str, Any]
 
 
-class JobOut(BaseModel):
+class JobSummaryOut(BaseModel):
     id: uuid.UUID
-    type: str
+    kind: str
     status: str
-    provider: str
-    payload: dict[str, Any]
-    result: dict[str, Any] | None
-    cost: int
-    started_at: dt.datetime | None = None
-    finished_at: dt.datetime | None = None
-    queue_position: int | None = None
+    created_at: dt.datetime
 
     class Config:
         from_attributes = True
 
-    @computed_field(return_type=int | None)
-    def eta_seconds(self) -> int | None:
-        return get_preset_eta_seconds(self.payload)
+
+class JobDetailOut(BaseModel):
+    id: uuid.UUID
+    kind: str
+    status: str
+    created_at: dt.datetime
+    params: dict[str, Any]
+    result: dict[str, Any] | None = None
+    error: str | None = None
+
+    class Config:
+        from_attributes = True
 
 
 class JobList(BaseModel):
-    items: list[JobOut]
+    items: list[JobSummaryOut]
     total: int
 
 
 class JobStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(" + "|".join(JOB_STATUSES) + ")$")
-
-
-class JobStatusOut(BaseModel):
-    status: str
-    error: str | None = None
-    result: dict[str, Any] | None = None
-    progress: float | None = None
 
 
 class JobResultOut(BaseModel):

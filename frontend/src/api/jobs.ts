@@ -2,23 +2,19 @@ import { apiFetch, API_BASE, getAuthToken } from "./client";
 
 export type Job = {
   id: string;
-  type: string;
+  kind: string;
   status: string;
-  provider: string;
-  payload: Record<string, unknown>;
-  result?: JobResultPayload | null;
-  cost: number;
-  eta_seconds?: number | null;
-  started_at?: string | null;
-  finished_at?: string | null;
-  queue_position?: number | null;
+  created_at: string;
 };
 
-export type JobStatus = {
+export type JobDetail = {
+  id: string;
+  kind: string;
   status: string;
-  error?: string | null;
+  created_at: string;
+  params: Record<string, unknown>;
   result?: JobResultPayload | null;
-  progress?: number | null;
+  error?: string | null;
 };
 
 export type JobResult = {
@@ -27,8 +23,8 @@ export type JobResult = {
   error?: string | null;
 };
 
-export type JobStatusResponse =
-  | { ok: true; status: JobStatus }
+export type JobDetailResponse =
+  | { ok: true; job: JobDetail }
   | { ok: false; statusCode: number; error: string };
 
 export type JobResultResponse = JobResult & { httpStatus: number };
@@ -48,17 +44,13 @@ export type JobResultPayload = {
 };
 
 export async function createJob(payload: { type: string; payload: Record<string, unknown> }) {
-  return apiFetch<Job>("/jobs", {
+  return apiFetch<JobDetail>("/jobs", {
     method: "POST",
     body: JSON.stringify(payload)
   });
 }
 
-export async function getJob(id: string) {
-  return apiFetch<JobStatus>(`/jobs/${id}`);
-}
-
-export async function getJobStatus(id: string): Promise<JobStatusResponse> {
+export async function getJobDetail(id: string): Promise<JobDetailResponse> {
   const headers = new Headers();
   const token = getAuthToken();
   if (token) {
@@ -74,11 +66,11 @@ export async function getJobStatus(id: string): Promise<JobStatusResponse> {
       error: text || "request_failed"
     };
   }
-  return { ok: true, status: JSON.parse(text) as JobStatus };
+  return { ok: true, job: JSON.parse(text) as JobDetail };
 }
 
 export async function listJobs() {
-  return apiFetch<{ items: Job[]; total: number }>("/jobs?mine=1");
+  return apiFetch<{ items: Job[]; total: number }>("/jobs?mine=true");
 }
 
 export async function getJobResult(id: string): Promise<JobResultResponse> {
