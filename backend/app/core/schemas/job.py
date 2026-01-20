@@ -28,6 +28,7 @@ class JobDetailOut(BaseModel):
     created_at: dt.datetime
     params: dict[str, Any]
     result: dict[str, Any] | None = None
+    result_files: list[dict[str, Any]] | None = None
     error: str | None = None
 
     class Config:
