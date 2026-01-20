@@ -1,4 +1,4 @@
-const API_BASE = "/api/v1";
+export const API_BASE = "/api/v1";
 
 let tokenCache: string | null = localStorage.getItem("auth_token");
 

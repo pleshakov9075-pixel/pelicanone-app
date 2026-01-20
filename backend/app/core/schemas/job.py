@@ -39,3 +39,14 @@ class JobList(BaseModel):
 
 class JobStatusUpdate(BaseModel):
     status: str = Field(..., pattern="^(" + "|".join(JOB_STATUSES) + ")$")
+
+
+class JobStatusOut(BaseModel):
+    status: str
+    error: str | None = None
+
+
+class JobResultOut(BaseModel):
+    status: str
+    result: Any | None = None
+    error: str | None = None

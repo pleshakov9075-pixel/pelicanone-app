@@ -1,32 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { getJob, Job } from "../api/jobs";
+import { getJob, getJobResult, JobResult, JobStatus } from "../api/jobs";
 import { NavHandler } from "./types";
 
-function formatDuration(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return "";
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  if (minutes === 0) {
-    return `${remainingSeconds} сек`;
-  }
-  if (remainingSeconds === 0) {
-    return `${minutes} мин`;
-  }
-  return `${minutes} мин ${remainingSeconds} сек`;
-}
-
 export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
-  const [job, setJob] = useState<Job | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
+  const [jobResult, setJobResult] = useState<JobResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [localStart, setLocalStart] = useState<number | null>(null);
-  const [tick, setTick] = useState(0);
+  const [resultError, setResultError] = useState<string | null>(null);
 
   useEffect(() => {
-    const jobId = localStorage.getItem("last_job_id");
-    if (!jobId) {
+    const storedJobId = localStorage.getItem("last_job_id");
+    if (!storedJobId) {
       setError("Job not found");
+      return;
+    }
+    setJobId(storedJobId);
+  }, []);
+
+  useEffect(() => {
+    if (!jobId) {
       return;
     }
     let timer: number | undefined;
@@ -34,8 +27,8 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
     const fetchJob = async () => {
       try {
         const data = await getJob(jobId);
-        setJob(data);
-        if (["succeeded", "failed", "canceled"].includes(data.status)) {
+        setJobStatus(data);
+        if (["finished", "failed"].includes(data.status)) {
           if (timer) {
             window.clearInterval(timer);
           }
@@ -53,65 +46,85 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
         window.clearInterval(timer);
       }
     };
-  }, []);
+  }, [jobId]);
 
   useEffect(() => {
-    if (!job) {
+    if (!jobId || !jobStatus || jobResult) {
       return;
     }
-    if (job.status === "queued" || job.status === "running") {
-      const startedAt = job.started_at ? Date.parse(job.started_at) : null;
-      setLocalStart(startedAt ?? Date.now());
-    } else {
-      setLocalStart(null);
-    }
-  }, [job?.id, job?.status, job?.started_at]);
-
-  useEffect(() => {
-    if (!localStart) {
+    if (!["finished", "failed"].includes(jobStatus.status)) {
       return;
     }
-    const interval = window.setInterval(() => setTick((prev) => prev + 1), 1000);
-    return () => window.clearInterval(interval);
-  }, [localStart]);
+    const fetchResult = async () => {
+      const result = await getJobResult(jobId);
+      setJobResult(result);
+      if (result.error) {
+        setResultError(result.error);
+      }
+      if (result.result) {
+        localStorage.setItem("last_job_result", JSON.stringify(result.result));
+      }
+    };
+    fetchResult().catch((err) => {
+      setResultError(err instanceof Error ? err.message : "error");
+    });
+  }, [jobId, jobResult, jobStatus]);
 
-  const etaDisplay = useMemo(() => {
-    if (!job?.eta_seconds || !localStart) {
+  const resultDisplay = useMemo(() => {
+    if (!jobResult?.result) {
       return null;
     }
-    const elapsedSeconds = Math.floor((Date.now() - localStart) / 1000);
-    const remaining = Math.max(job.eta_seconds - elapsedSeconds, 0);
-    return { remaining, elapsed: elapsedSeconds };
-  }, [job?.eta_seconds, localStart, tick]);
+    if (typeof jobResult.result === "string") {
+      return { text: jobResult.result, files: [] };
+    }
+    if (typeof jobResult.result === "object" && jobResult.result !== null) {
+      const payload = jobResult.result as { text?: string; files?: string[] };
+      return { text: payload.text ?? "", files: payload.files ?? [] };
+    }
+    return null;
+  }, [jobResult]);
 
   return (
     <div className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">Статус задачи</h2>
       {error ? <div className="text-red-500">{error}</div> : null}
-      {job ? (
+      {jobId && jobStatus ? (
         <div className="rounded-lg border p-4">
-          <div>ID: {job.id}</div>
-          <div>Статус: {job.status}</div>
-          {job.eta_seconds && (job.status === "queued" || job.status === "running") ? (
-            <div className="mt-2 text-sm text-slate-600">
-              <div>
-                Примерное время: ~{formatDuration(job.eta_seconds)}
-              </div>
-              {etaDisplay ? (
-                <div>Осталось примерно: {formatDuration(etaDisplay.remaining)}</div>
-              ) : null}
-              <div className="text-xs text-slate-500">
-                Время примерное, зависит от нагрузки.
-              </div>
-            </div>
-          ) : null}
-          {job.result?.files && Array.isArray(job.result.files) && job.result.files.length > 0 ? (
-            <a className="text-blue-600" href={job.result.files[0]} target="_blank" rel="noreferrer">
-              Открыть результат
-            </a>
-          ) : null}
+          <div>ID: {jobId}</div>
+          <div>Статус: {jobStatus.status}</div>
+          {jobStatus.error ? <div className="mt-2 text-red-500">{jobStatus.error}</div> : null}
         </div>
       ) : null}
+      <div className="rounded-lg border p-4">
+        <div className="mb-2 font-semibold">Результат</div>
+        {resultError ? <div className="text-red-500">{resultError}</div> : null}
+        {resultDisplay?.text ? (
+          <textarea
+            className="mt-2 w-full rounded border p-2 text-sm"
+            rows={6}
+            readOnly
+            value={resultDisplay.text}
+          />
+        ) : null}
+        {resultDisplay?.files && resultDisplay.files.length > 0 ? (
+          <div className="mt-2 flex flex-col gap-2">
+            <a className="text-blue-600" href={resultDisplay.files[0]} target="_blank" rel="noreferrer">
+              {resultDisplay.files[0]}
+            </a>
+            <a
+              className="inline-flex w-fit rounded bg-blue-600 px-3 py-1 text-white"
+              href={resultDisplay.files[0]}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Открыть
+            </a>
+          </div>
+        ) : null}
+        {!resultDisplay && !resultError ? (
+          <div className="text-sm text-slate-500">Ожидаем результат задачи...</div>
+        ) : null}
+      </div>
       <button className="text-blue-600" onClick={() => onNavigate("history")}>К истории</button>
     </div>
   );

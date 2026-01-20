@@ -26,11 +26,11 @@ DEFAULT_TIMEOUTS = {
 logger = logging.getLogger(__name__)
 
 
-def run_job(job_id: str) -> None:
-    asyncio.run(_run_job_async(job_id))
+def run_job(job_id: str) -> dict | None:
+    return asyncio.run(_run_job_async(job_id))
 
 
-async def _run_job_async(job_id: str) -> None:
+async def _run_job_async(job_id: str) -> dict | None:
     async with async_session() as session:
         job = await session.get(Job, job_id)
         if not job or job.status in {"canceled", "succeeded", "failed"}:
@@ -40,17 +40,24 @@ async def _run_job_async(job_id: str) -> None:
         await session.commit()
 
         client = GenApiClient()
+        result_payload = None
+        error: Exception | None = None
         try:
             result = await _execute_with_retry(client, job.type, job.payload)
             job.status = "succeeded"
-            job.result = normalize_result(result)
+            result_payload = normalize_result(result)
+            job.result = result_payload
         except Exception as exc:  # pragma: no cover - fallback for unknown errors
             job.status = "failed"
             job.result = {"error": str(exc)}
+            error = exc
         finally:
             if job.status in {"succeeded", "failed", "canceled"}:
                 job.finished_at = dt.datetime.utcnow()
             await session.commit()
+        if error:
+            raise error
+        return result_payload
 
 
 async def _execute_with_retry(client: GenApiClient, job_type: str, payload: dict):
