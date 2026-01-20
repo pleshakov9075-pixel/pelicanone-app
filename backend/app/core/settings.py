@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import BaseModel, Field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,18 +17,8 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://redis:6379/0", validation_alias="REDIS_URL")
 
-    jwt_secret: str = Field(default="change-me", validation_alias="JWT_SECRET")
-    jwt_algorithm: str = "HS256"
-    jwt_exp_minutes: int = 60 * 24 * 7
-
     telegram_bot_token: str = Field(default="", validation_alias="TELEGRAM_BOT_TOKEN")
-    vk_app_secret: str = Field(default="", validation_alias="VK_APP_SECRET")
-    dev_auth: bool = Field(default=False, validation_alias="DEV_AUTH")
-    dev_auth_bypass: bool = Field(default=False, validation_alias="DEV_AUTH_BYPASS")
-    dev_user_platform_user_id: str = Field(
-        default="dev", validation_alias="DEV_USER_PLATFORM_USER_ID"
-    )
-    dev_user_id: str | None = Field(default=None, validation_alias="DEV_USER_ID")
+    admin_telegram_ids: str = Field(default="", validation_alias="ADMIN_TELEGRAM_IDS")
 
     genapi_base_url: str = Field(
         default="https://api.gen-api.ru/api/v1", validation_alias="GENAPI_BASE_URL"
@@ -43,6 +33,13 @@ class Settings(BaseSettings):
         default=10 * 60, validation_alias="MEDIA_CLEANUP_INTERVAL_SECONDS"
     )
 
+    price_text_rub: int = Field(default=1, validation_alias="PRICE_TEXT_RUB")
+    price_image_rub: int = Field(default=9, validation_alias="PRICE_IMAGE_RUB")
+    price_video_rub: int = Field(default=50, validation_alias="PRICE_VIDEO_RUB")
+    price_audio_rub: int = Field(default=5, validation_alias="PRICE_AUDIO_RUB")
+    price_upscale_rub: int = Field(default=3, validation_alias="PRICE_UPSCALE_RUB")
+    price_edit_rub: int = Field(default=8, validation_alias="PRICE_EDIT_RUB")
+
     credit_topup_packages: list[int] = [100, 300, 500]
 
 
@@ -51,13 +48,12 @@ def get_settings() -> Settings:
     return Settings()
 
 
-class CostTable(BaseModel):
-    text: int = 1
-    image: int = 10
-    video: int = 50
-    audio: int = 5
-    upscale: int = 3
-    edit: int = 8
-
-
-COST_TABLE = CostTable()
+def build_cost_table(settings: Settings) -> dict[str, int]:
+    return {
+        "text": settings.price_text_rub,
+        "image": settings.price_image_rub,
+        "video": settings.price_video_rub,
+        "audio": settings.price_audio_rub,
+        "upscale": settings.price_upscale_rub,
+        "edit": settings.price_edit_rub,
+    }

@@ -16,6 +16,7 @@ class PresetOut(BaseModel):
     label: str
     job_type: str
     network_id: str
+    price_rub: int
     eta_seconds: int | None = None
     poll_interval_seconds: float | None = None
     timeout_seconds: int | None = None

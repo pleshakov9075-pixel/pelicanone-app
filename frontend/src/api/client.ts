@@ -1,11 +1,6 @@
 import { getTelegramInitData } from "../adapters/telegram";
-import { ru } from "../i18n/ru";
 
 export const API_BASE = "/api/v1";
-export const DEV_AUTH_BYPASS_ENABLED = import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
-
-let tokenCache: string | null = localStorage.getItem("auth_token");
-let initDataWarningShown = false;
 
 const TELEGRAM_INITDATA_HEADER = "X-Telegram-InitData";
 
@@ -17,36 +12,16 @@ export function hasTelegramInitData() {
   return hasInitDataValue(getTelegramInitData());
 }
 
-export function notifyMissingTelegramInitData() {
-  if (initDataWarningShown) {
-    return;
-  }
-  if (typeof window === "undefined") {
-    return;
-  }
-  initDataWarningShown = true;
-  window.alert(ru.messages.telegramInitDataMissing);
-}
-
-export function setAuthToken(token: string) {
-  tokenCache = token;
-  localStorage.setItem("auth_token", token);
-}
-
-export function getAuthToken() {
-  return tokenCache;
+export function getTelegramInitDataHeader(): string | null {
+  const initData = getTelegramInitData();
+  return hasInitDataValue(initData) ? (initData as string) : null;
 }
 
 export function buildApiHeaders(optionsHeaders: HeadersInit = {}) {
   const headers = new Headers(optionsHeaders);
-  if (tokenCache) {
-    headers.set("Authorization", `Bearer ${tokenCache}`);
-  }
-  const initData = getTelegramInitData();
-  if (hasInitDataValue(initData)) {
-    headers.set(TELEGRAM_INITDATA_HEADER, initData as string);
-  } else {
-    notifyMissingTelegramInitData();
+  const initData = getTelegramInitDataHeader();
+  if (initData) {
+    headers.set(TELEGRAM_INITDATA_HEADER, initData);
   }
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -54,12 +29,29 @@ export function buildApiHeaders(optionsHeaders: HeadersInit = {}) {
   return headers;
 }
 
+async function parseErrorDetail(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return "request_failed";
+  }
+  try {
+    const parsed = JSON.parse(text) as { detail?: string };
+    return parsed.detail || text;
+  } catch {
+    return text;
+  }
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const initData = getTelegramInitDataHeader();
+  if (!initData) {
+    throw new Error("telegram_initdata_missing");
+  }
   const headers = buildApiHeaders(options.headers || {});
   const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "request_failed");
+    const detail = await parseErrorDetail(response);
+    throw new Error(detail || "request_failed");
   }
   return response.json() as Promise<T>;
 }

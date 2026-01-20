@@ -27,7 +27,6 @@ export const ru = {
     download: "Скачать",
     copyLink: "Копировать ссылку",
     logout: "Выйти",
-    devLogin: "Войти (DEV)",
     json: "JSON",
     hideJson: "Скрыть JSON",
     requestTab: "Запрос",
@@ -53,7 +52,7 @@ export const ru = {
     model: "Модель",
     parameters: "Параметры",
     externalLink: "Внешняя ссылка",
-    devMode: "DEV режим"
+    price: "Цена"
   },
   messages: {
     loadingPresets: "Загрузка пресетов...",
@@ -62,20 +61,15 @@ export const ru = {
     resultPending: "Результат появится после завершения генерации.",
     generating: "Генерация в процессе...",
     noJobs: "Нет задач",
-    devModeDisabled:
-      "DEV режим отключён. Установите VITE_DEV_AUTH=true для тестирования.",
-    devModeHint: "Веб режим: используйте DEV авторизацию для тестирования.",
-    authRequired:
-      "Веб режим: требуется JWT от backend. Запустите приложение через Telegram/VK.",
-    authFailed: "Авторизация не удалась. Проверьте доступность backend.",
     authorizing: "Авторизация...",
     jobNotFound: "Задача не найдена",
     jobTimeout: "Задача выполняется слишком долго. Обновите статус или попробуйте позже.",
-    telegramInitDataMissing: "Откройте приложение в Telegram или включите DEV режим.",
+    telegramInitDataMissing: "Откройте приложение в Telegram.",
     topupStub: "Платежи пока не подключены. Сейчас мок."
   },
   errors: {
     generationFailed: "Ошибка генерации",
+    insufficientFunds: "Недостаточно средств на балансе.",
     requestFailed: "Не удалось выполнить запрос",
     copyFailed: "Не удалось скопировать",
     copySuccess: "Скопировано!"

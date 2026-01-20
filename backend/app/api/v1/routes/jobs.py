@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, get_rq_queue
+from app.core.repositories.credits import CreditRepository
 from app.core.repositories.jobs import JobRepository
 from app.core.schemas import JobCreate, JobDetailOut, JobList, JobResultOut, JobSummaryOut
 from app.core.services.jobs import JobService
@@ -107,4 +108,10 @@ async def cancel_job(
     job.error = "canceled"
     job.finished_at = dt.datetime.utcnow()
     await session.commit()
+    if job.cost:
+        credits = CreditRepository(session)
+        refunded = await credits.has_job_reason(job.id, "job_refund")
+        if not refunded:
+            await credits.create_tx(user.id, delta=job.cost, reason="job_refund", job_id=job.id)
+            await session.commit()
     return JobDetailOut.model_validate(job, from_attributes=True)

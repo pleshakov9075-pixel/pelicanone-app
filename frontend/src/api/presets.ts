@@ -14,6 +14,7 @@ export type Preset = {
   label: string;
   job_type: string;
   network_id: string;
+  price_rub: number;
   eta_seconds?: number | null;
   poll_interval_seconds?: number | null;
   timeout_seconds?: number | null;

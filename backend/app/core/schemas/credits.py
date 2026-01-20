@@ -2,7 +2,7 @@ import uuid
 from pydantic import BaseModel
 
 
-class CreditTxOut(BaseModel):
+class CreditLedgerOut(BaseModel):
     id: uuid.UUID
     delta: int
     reason: str
@@ -16,6 +16,6 @@ class CreditBalance(BaseModel):
     balance: int
 
 
-class CreditTxList(BaseModel):
-    items: list[CreditTxOut]
+class CreditLedgerList(BaseModel):
+    items: list[CreditLedgerOut]
     total: int

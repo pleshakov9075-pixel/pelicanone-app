@@ -75,7 +75,6 @@ export function AppRouter() {
     onNavigate: (route: RouteKey, payload?: { jobId?: string | null }) => void;
     jobId?: string | null;
   }>;
-  const isDevMode = localStorage.getItem("dev_mode") === "true";
 
   const handleNavigate = (key: RouteKey, payload?: { jobId?: string | null }) => {
     const next = { key, jobId: payload?.jobId };
@@ -112,23 +111,6 @@ export function AppRouter() {
               {ru.routes[key]}
             </Button>
           ))}
-          {isDevMode ? (
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                {ru.labels.devMode}
-              </span>
-              <Button
-                onClick={() => {
-                  localStorage.removeItem("auth_token");
-                  localStorage.removeItem("dev_mode");
-                  location.reload();
-                }}
-                type="button"
-              >
-                {ru.actions.logout}
-              </Button>
-            </div>
-          ) : null}
         </header>
         <Active onNavigate={handleNavigate} jobId={routeState.jobId} />
       </div>

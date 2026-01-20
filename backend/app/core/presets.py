@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.settings import build_cost_table, get_settings
+
 PRESET_DEFINITIONS: list[dict[str, Any]] = [
     {
         "id": "text",
@@ -251,7 +253,13 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
 
 
 def list_presets() -> list[dict[str, Any]]:
-    return PRESET_DEFINITIONS
+    settings = get_settings()
+    price_map = build_cost_table(settings)
+    presets: list[dict[str, Any]] = []
+    for preset in PRESET_DEFINITIONS:
+        job_type = preset["job_type"]
+        presets.append({**preset, "price_rub": price_map[job_type]})
+    return presets
 
 
 def get_preset_by_network_id(network_id: str) -> dict[str, Any] | None:
