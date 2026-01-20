@@ -20,9 +20,16 @@ class JobService:
     async def create_job_with_charge(self, user_id, job_type: str, payload: dict):
         normalized_payload = normalize_payload(job_type, payload)
         cost = self.compute_cost(job_type)
-        balance = await self.credits.get_balance(user_id)
-        if balance - cost < 0:
-            raise ValueError("insufficient_funds")
-        job = await self.jobs.create_job(user_id, job_type, normalized_payload, cost)
-        await self.credits.create_tx(user_id, delta=-cost, reason="job_charge", job_id=job.id)
-        return job
+        async with self.session.begin():
+            user = await self.credits.lock_user(user_id)
+            if user.balance < cost:
+                raise InsufficientCreditsError("insufficient_funds")
+            job = await self.jobs.create_job(user_id, job_type, normalized_payload, cost)
+            await self.credits.create_tx_for_user(
+                user, delta=-cost, reason="job_charge", job_id=job.id
+            )
+            return job
+
+
+class InsufficientCreditsError(ValueError):
+    pass

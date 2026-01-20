@@ -138,7 +138,7 @@ export function JobDetails({
         if (response.job.result) {
           setResult(response.job.result);
         }
-        if (response.job.status === "done" || response.job.status === "failed") {
+        if (response.job.status === "done" || response.job.status === "error") {
           setIsPolling(false);
           if (timer) {
             window.clearInterval(timer);
@@ -249,7 +249,7 @@ export function JobDetails({
       </div>
 
       {jobError ? <div className="rounded-lg border border-red-200 bg-red-50 p-3">{jobError}</div> : null}
-      {job?.status === "failed" ? (
+      {job?.status === "error" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
           {job.error ?? ru.errors.generationFailed}
         </div>
