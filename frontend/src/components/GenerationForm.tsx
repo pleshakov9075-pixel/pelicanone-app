@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Preset, PresetField } from "../api/presets";
 import { Button } from "./ui/button";
+import { formatJobType, formatSeconds, ru } from "../i18n/ru";
 
 export type GenerationParams = Record<string, string | number | boolean | undefined>;
 
@@ -28,23 +29,21 @@ function formatDuration(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) {
     return "";
   }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.floor(seconds % 60);
-  if (minutes === 0) {
-    return `${remainingSeconds} сек`;
-  }
-  if (remainingSeconds === 0) {
-    return `${minutes} мин`;
-  }
-  return `${minutes} мин ${remainingSeconds} сек`;
+  return formatSeconds(seconds);
 }
 
 export function GenerationForm({
   presets,
-  onSubmit
+  onSubmit,
+  phase,
+  elapsedSeconds,
+  activeEtaSeconds
 }: {
   presets: Preset[];
   onSubmit: (preset: Preset, params: GenerationParams) => void;
+  phase: "idle" | "submitting" | "running" | "done" | "failed";
+  elapsedSeconds: number;
+  activeEtaSeconds: number | null;
 }) {
   const [selectedPresetId, setSelectedPresetId] = useState(presets[0]?.id ?? "");
   const [values, setValues] = useState<Record<string, FieldValue>>({});
@@ -80,9 +79,13 @@ export function GenerationForm({
 
   const requiredFields = selectedPreset.fields.filter((field) => field.required);
   const optionalFields = selectedPreset.fields.filter((field) => !field.required);
-  const etaLabel = selectedPreset.eta_seconds
-    ? `Ожидание ~ ${formatDuration(selectedPreset.eta_seconds)}`
-    : null;
+  const idleEtaSeconds = selectedPreset.eta_seconds ?? null;
+  const displayEtaSeconds =
+    phase === "submitting" || phase === "running" ? activeEtaSeconds : idleEtaSeconds;
+  const showElapsed = phase === "submitting" || phase === "running";
+  const showIdleEstimate = phase === "idle" && idleEtaSeconds;
+  const remainingSeconds =
+    displayEtaSeconds && elapsedSeconds > 0 ? Math.max(displayEtaSeconds - elapsedSeconds, 0) : 0;
 
   const currentParams = useMemo(() => {
     const params: GenerationParams = {};
@@ -204,7 +207,7 @@ export function GenerationForm({
     <form className="flex flex-col gap-4 rounded-lg border p-4" onSubmit={handleSubmit}>
       {jobTypes.length > 1 ? (
         <label className="flex flex-col gap-2">
-          <span>Тип генерации</span>
+          <span>{ru.labels.generationType}</span>
           <select
             className="rounded border p-2"
             value={selectedJobType}
@@ -219,7 +222,7 @@ export function GenerationForm({
           >
             {jobTypes.map((type) => (
               <option key={type} value={type}>
-                {type}
+                {formatJobType(type)}
               </option>
             ))}
           </select>
@@ -227,7 +230,7 @@ export function GenerationForm({
       ) : null}
 
       <label className="flex flex-col gap-2">
-        <span>Preset</span>
+        <span>{ru.labels.preset}</span>
         <select
           className="rounded border p-2"
           value={selectedPresetId}
@@ -250,7 +253,7 @@ export function GenerationForm({
             className="text-left text-sm text-blue-600"
             onClick={() => setShowAdvanced((prev) => !prev)}
           >
-            {showAdvanced ? "Скрыть расширенные настройки" : "Расширенные настройки"}
+            {showAdvanced ? ru.actions.hideAdvanced : ru.actions.showAdvanced}
           </button>
           {showAdvanced ? (
             <div className="flex flex-col gap-4">{optionalFields.map(renderField)}</div>
@@ -259,7 +262,7 @@ export function GenerationForm({
       ) : null}
 
       <label className="flex flex-col gap-2">
-        <span>Референс (скоро)</span>
+        <span>{ru.labels.referenceSoon}</span>
         <input className="rounded border p-2" type="file" accept="image/*" />
       </label>
 
@@ -269,7 +272,7 @@ export function GenerationForm({
           className="text-sm text-blue-600"
           onClick={() => setShowJson((prev) => !prev)}
         >
-          {showJson ? "Скрыть JSON" : "JSON"}
+          {showJson ? ru.actions.hideJson : ru.actions.json}
         </button>
         {showJson ? (
           <pre className="mt-2 whitespace-pre-wrap rounded border bg-slate-50 p-2 text-xs">
@@ -279,8 +282,26 @@ export function GenerationForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <Button type="submit">Сгенерировать</Button>
-        {etaLabel ? <span className="text-xs text-slate-500">{etaLabel}</span> : null}
+        <Button type="submit">{ru.actions.generate}</Button>
+        {showElapsed || showIdleEstimate ? (
+          <span className="text-xs text-slate-500">
+            {showElapsed ? (
+              <>
+                {ru.labels.elapsed}: {formatSeconds(elapsedSeconds)}
+                {displayEtaSeconds ? (
+                  <>
+                    {" "}
+                    · {ru.labels.remaining}: ~{formatSeconds(remainingSeconds)}
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {ru.labels.waiting}: ~{formatDuration(displayEtaSeconds ?? 0)}
+              </>
+            )}
+          </span>
+        ) : null}
       </div>
     </form>
   );

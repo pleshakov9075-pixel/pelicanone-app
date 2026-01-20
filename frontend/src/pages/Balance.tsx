@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getBalance } from "../api/credits";
 import { topup } from "../api/billing";
 import { TopUpModal } from "../components/TopUpModal";
+import { ru } from "../i18n/ru";
 import { NavHandler } from "./types";
 
 export function Balance({ onNavigate: _onNavigate }: { onNavigate?: NavHandler }) {
@@ -23,7 +24,7 @@ export function Balance({ onNavigate: _onNavigate }: { onNavigate?: NavHandler }
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">Баланс</h2>
+      <h2 className="text-xl font-semibold">{ru.titles.balance}</h2>
       <div className="text-2xl">{balance} ₽</div>
       <TopUpModal onTopUp={handleTopup} />
     </div>

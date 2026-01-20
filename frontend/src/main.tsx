@@ -7,6 +7,7 @@ import { Platform, detectPlatform } from "./adapters/platform";
 import { getTelegramInitData } from "./adapters/telegram";
 import { getVkLaunchParams } from "./adapters/vk";
 import { apiFetch, getAuthToken, setAuthToken } from "./api/client";
+import { ru } from "./i18n/ru";
 import "./styles/index.css";
 
 function App() {
@@ -65,27 +66,23 @@ function App() {
   }, []);
 
   if (authState === "loading") {
-    return <div className="p-6">Authorizing...</div>;
+    return <div className="p-6">{ru.messages.authorizing}</div>;
   }
 
   if (authState === "dev" && platform === "web") {
     if (!devAuthEnabled) {
       return (
         <div className="p-6">
-          <h1 className="text-xl font-semibold">PelicanOne 2.0</h1>
-          <p className="text-sm text-gray-500">
-            DEV режим отключён. Установите VITE_DEV_AUTH=true для тестирования.
-          </p>
+          <h1 className="text-xl font-semibold">{ru.titles.app}</h1>
+          <p className="text-sm text-gray-500">{ru.messages.devModeDisabled}</p>
         </div>
       );
     }
     return (
       <div className="p-6 space-y-4">
         <div>
-          <h1 className="text-xl font-semibold">PelicanOne 2.0</h1>
-          <p className="text-sm text-gray-500">
-            Web режим: используйте DEV авторизацию для тестирования.
-          </p>
+          <h1 className="text-xl font-semibold">{ru.titles.app}</h1>
+          <p className="text-sm text-gray-500">{ru.messages.devModeHint}</p>
         </div>
         {devError ? <p className="text-sm text-red-500">{devError}</p> : null}
         <button
@@ -100,13 +97,13 @@ function App() {
                 setAuthState("ready");
               })
               .catch(() => {
-                setDevError("DEV login недоступен. Проверьте DEV_AUTH на backend.");
+                setDevError("DEV вход недоступен. Проверьте DEV_AUTH на backend.");
                 setAuthState("dev");
               });
           }}
           type="button"
         >
-          DEV login
+          {ru.actions.devLogin}
         </button>
       </div>
     );
@@ -115,11 +112,11 @@ function App() {
   if (authState === "error") {
     return (
       <div className="p-6">
-        <h1 className="text-xl font-semibold">PelicanOne 2.0</h1>
+        <h1 className="text-xl font-semibold">{ru.titles.app}</h1>
         <p className="text-sm text-gray-500">
           {platform === "web"
-            ? "Web режим: требуется JWT от backend. Запустите приложение через Telegram/VK."
-            : "Авторизация не удалась. Проверьте доступность backend."}
+            ? ru.messages.authRequired
+            : ru.messages.authFailed}
         </p>
       </div>
     );
