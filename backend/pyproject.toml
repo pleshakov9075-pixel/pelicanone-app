@@ -13,6 +13,7 @@ dependencies = [
     "alembic>=1.13",
     "redis>=5.0",
     "rq>=1.15",
+    "rq-scheduler>=0.13",
     "httpx>=0.27",
     "pyjwt>=2.8",
 ]
