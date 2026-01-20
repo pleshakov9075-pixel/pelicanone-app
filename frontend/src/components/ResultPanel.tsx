@@ -32,7 +32,7 @@ export function ResultPanel({ status, result, error, debug, isLoading }: ResultP
     if (!fileUrl) {
       return false;
     }
-    if (fileUrl.startsWith("/media/")) {
+    if (fileUrl.startsWith("/api/")) {
       return false;
     }
     try {

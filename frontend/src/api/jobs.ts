@@ -19,6 +19,7 @@ export type JobDetail = {
   created_at: string;
   params: Record<string, unknown>;
   result?: JobResultPayload | null;
+  result_files?: Array<Record<string, unknown>> | null;
   error?: string | null;
 };
 
@@ -78,7 +79,7 @@ export async function listJobs() {
 
 export async function getJobResult(id: string): Promise<JobResultResponse> {
   if (!getTelegramInitDataHeader()) {
-    return { status: "failed", error: "telegram_initdata_missing", httpStatus: 401 };
+    return { status: "error", error: "telegram_initdata_missing", httpStatus: 401 };
   }
   const headers = buildApiHeaders();
   const response = await fetch(`${API_BASE}/jobs/${id}/result`, { headers });
@@ -94,7 +95,7 @@ export async function getJobResult(id: string): Promise<JobResultResponse> {
   if (!response.ok) {
     const errorMessage = payload.error ?? text;
     return {
-      status: payload.status ?? "failed",
+      status: payload.status ?? "error",
       error: errorMessage || "request_failed",
       httpStatus: response.status
     };

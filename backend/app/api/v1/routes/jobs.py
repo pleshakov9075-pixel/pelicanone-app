@@ -8,7 +8,7 @@ from app.api.v1.deps import get_current_user, get_rq_queue
 from app.core.repositories.credits import CreditRepository
 from app.core.repositories.jobs import JobRepository
 from app.core.schemas import JobCreate, JobDetailOut, JobList, JobResultOut, JobSummaryOut
-from app.core.services.jobs import JobService
+from app.core.services.jobs import InsufficientCreditsError, JobService
 from app.db import get_session
 from app.workers.tasks import run_job
 
@@ -32,9 +32,9 @@ async def create_job(
     service = JobService(session)
     try:
         job = await service.create_job_with_charge(user.id, payload.type, payload.payload)
-        await session.commit()
+    except InsufficientCreditsError as exc:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Not enough credits.") from exc
     except ValueError as exc:
-        await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     queue.enqueue(run_job, str(job.id), result_ttl=86400)
@@ -54,6 +54,7 @@ async def get_job(
     payload = JobDetailOut.model_validate(job, from_attributes=True)
     if payload.status != "done":
         payload.result = None
+        payload.result_files = None
     return payload
 
 
@@ -68,8 +69,8 @@ async def get_job_result(
     job = await repo.get_job(job_id)
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
-    if job.status == "failed":
-        return JobResultOut(status="failed", error=job.error)
+    if job.status == "error":
+        return JobResultOut(status="error", error=job.error)
     if job.status != "done":
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
@@ -102,10 +103,10 @@ async def cancel_job(
     job = await repo.get_job(job_id)
     if not job or job.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
-    if job.status not in {"queued", "running"}:
+    if job.status not in {"queued", "processing"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="cannot_cancel")
-    job.status = "failed"
-    job.error = "canceled"
+    job.status = "error"
+    job.error = "Canceled"
     job.finished_at = dt.datetime.utcnow()
     await session.commit()
     if job.cost:

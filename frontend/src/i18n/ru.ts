@@ -76,9 +76,9 @@ export const ru = {
   },
   statuses: {
     queued: "В очереди",
-    running: "Выполняется",
+    processing: "Генерируется",
     done: "Готово",
-    failed: "Ошибка",
+    error: "Ошибка",
     unknown: "Неизвестно"
   },
   jobTypes: {

@@ -1,12 +1,14 @@
 import asyncio
 import datetime as dt
 import logging
+import shutil
 import time
+from pathlib import Path
 
 import httpx
 
 from app.core.models.job import Job
-from app.core.media import cleanup_media_files, persist_result_files
+from app.core.job_files import persist_result_files
 from app.core.presets import get_preset_polling_settings
 from app.core.repositories.credits import CreditRepository
 from app.core.settings import get_settings
@@ -36,9 +38,9 @@ def run_job(job_id: str) -> dict:
 async def _run_job_async(job_id: str) -> dict:
     async with async_session() as session:
         job = await session.get(Job, job_id)
-        if not job or job.status in {"done", "failed"}:
+        if not job or job.status in {"done", "error"}:
             return _build_empty_result(job.type if job else "text")
-        job.status = "running"
+        job.status = "processing"
         job.started_at = dt.datetime.utcnow()
         await session.commit()
 
@@ -49,20 +51,23 @@ async def _run_job_async(job_id: str) -> dict:
             result = await _execute_with_retry(client, job.type, job.payload)
             job.status = "done"
             result_payload = normalize_result(result, job.type)
-            result_payload = await persist_result_files(result_payload)
+            result_payload, result_files = await persist_result_files(str(job.id), result_payload)
             job.result = result_payload
+            job.result_files = result_files
             job.error = None
         except Exception as exc:  # pragma: no cover - fallback for unknown errors
-            job.status = "failed"
-            job.error = str(exc)
-            result_payload = _build_error_result(job.type, str(exc))
-            job.result = result_payload
+            logger.exception("Job %s failed", job_id, exc_info=exc)
+            job.status = "error"
+            job.error = _human_error_message(exc)
+            result_payload = None
+            job.result = None
+            job.result_files = None
             error = exc
         finally:
-            if job.status in {"done", "failed"}:
+            if job.status in {"done", "error"}:
                 job.finished_at = dt.datetime.utcnow()
             await session.commit()
-            if job.status == "failed" and job.cost:
+            if job.status == "error" and job.cost:
                 credits = CreditRepository(session)
                 refunded = await credits.has_job_reason(job.id, "job_refund")
                 if not refunded:
@@ -163,8 +168,42 @@ def _fallback_timeout(job_type: str, payload: dict) -> int:
     return DEFAULT_TIMEOUTS.get(job_type, 120)
 
 
-def cleanup_media() -> dict[str, int]:
-    return cleanup_media_files()
+def cleanup_job_files() -> dict[str, int]:
+    return asyncio.run(_cleanup_job_files_async())
+
+
+async def _cleanup_job_files_async() -> dict[str, int]:
+    settings = get_settings()
+    storage_root = Path(settings.files_storage_path) / "jobs"
+    if not storage_root.exists():
+        return {"removed": 0}
+    now = time.time()
+    ttl_seconds = settings.files_ttl_hours * 3600
+    removed = 0
+    removed_job_ids: list[str] = []
+    for job_dir in storage_root.iterdir():
+        if not job_dir.is_dir():
+            continue
+        age = now - job_dir.stat().st_mtime
+        if age <= ttl_seconds:
+            continue
+        try:
+            shutil.rmtree(job_dir)
+            removed += 1
+            removed_job_ids.append(job_dir.name)
+        except FileNotFoundError:
+            continue
+
+    if not removed_job_ids:
+        return {"removed": 0}
+
+    async with async_session() as session:
+        for job_id in removed_job_ids:
+            job = await session.get(Job, job_id)
+            if job and job.result_files is not None:
+                job.result_files = None
+        await session.commit()
+    return {"removed": removed}
 
 
 def _build_empty_result(job_type: str) -> dict:
@@ -190,3 +229,16 @@ def _normalize_result_type(job_type: str) -> str:
     if mapped not in {"text", "image", "video", "audio"}:
         return "text"
     return mapped
+
+
+def _human_error_message(exc: Exception) -> str:
+    message = str(exc) if exc else ""
+    if not message:
+        return "Generation failed."
+    if message == "genapi_timeout":
+        return "Generation timed out."
+    if message == "genapi_failed":
+        return "Generation failed. Please try again."
+    if message == "missing_request_id":
+        return "Generation failed. Missing request id."
+    return message

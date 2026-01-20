@@ -39,10 +39,9 @@ alembic upgrade head
 Обязательные переменные:
 
 ```
-MEDIA_DIR=/app/media
-MEDIA_BASE_URL=/media
-MEDIA_TTL_SECONDS=86400
-MEDIA_CLEANUP_INTERVAL_SECONDS=600
+FILES_STORAGE_PATH=/app/storage
+FILES_TTL_HOURS=24
+FILES_CLEANUP_INTERVAL_SECONDS=600
 ```
 
 ## Проверка
@@ -54,7 +53,7 @@ curl -I http://ai.pelicanstudio.ru        # 301 -> https
 curl -I https://ai.pelicanstudio.ru       # 200
 curl -I https://ai.pelicanstudio.ru/.env  # 404
 curl -I https://ai.pelicanstudio.ru/assets/index-*.js | grep -i content-type
-curl -I https://ai.pelicanstudio.ru/media/ # 404 (листинг запрещён)
+curl -I https://ai.pelicanstudio.ru/api/v1/files/ # 404 (листинг запрещён)
 curl -s https://ai.pelicanstudio.ru/api/v1/health
 ```
 
@@ -107,20 +106,20 @@ curl -H "Authorization: Bearer ${TOKEN}" \
 - Chrome / Telegram WebView грузят JS и CSS без pending / reset.
 - Сертификат валиден (Let’s Encrypt).
 
-## Проверка media/cleanup
+## Проверка files/cleanup
 
-1. Установить тестовый TTL (например, `MEDIA_TTL_SECONDS=60`).
+1. Установить тестовый TTL (например, `FILES_TTL_HOURS=0` и подождать).
 2. Сгенерировать файл через API.
 3. Проверить, что файл доступен по URL из результата:
 
 ```bash
-curl -I https://ai.pelicanstudio.ru/media/<file_id>.<ext>
+curl -I https://ai.pelicanstudio.ru/api/v1/files/<job_id>/<file_name>
 ```
 
 4. Подождать >60 секунд и убедиться, что файл удалён:
 
 ```bash
-curl -I https://ai.pelicanstudio.ru/media/<file_id>.<ext> # 404
+curl -I https://ai.pelicanstudio.ru/api/v1/files/<job_id>/<file_name> # 404
 ```
 
 ## Пример curl для jobs

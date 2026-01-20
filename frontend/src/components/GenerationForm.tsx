@@ -41,7 +41,7 @@ export function GenerationForm({
 }: {
   presets: Preset[];
   onSubmit: (preset: Preset, params: GenerationParams) => void;
-  phase: "idle" | "submitting" | "running" | "done" | "failed";
+  phase: "idle" | "submitting" | "processing" | "done" | "failed";
   elapsedSeconds: number;
   activeEtaSeconds: number | null;
 }) {
@@ -81,8 +81,8 @@ export function GenerationForm({
   const optionalFields = selectedPreset.fields.filter((field) => !field.required);
   const idleEtaSeconds = selectedPreset.eta_seconds ?? null;
   const displayEtaSeconds =
-    phase === "submitting" || phase === "running" ? activeEtaSeconds : idleEtaSeconds;
-  const showElapsed = phase === "submitting" || phase === "running";
+    phase === "submitting" || phase === "processing" ? activeEtaSeconds : idleEtaSeconds;
+  const showElapsed = phase === "submitting" || phase === "processing";
   const showIdleEstimate = phase === "idle" && idleEtaSeconds;
   const remainingSeconds =
     displayEtaSeconds && elapsedSeconds > 0 ? Math.max(displayEtaSeconds - elapsedSeconds, 0) : 0;
