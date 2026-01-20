@@ -7,6 +7,7 @@ Create Date: 2026-02-12 10:15:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision = "2f54f5a8c2d1"
@@ -15,8 +16,16 @@ branch_labels = None
 depends_on = None
 
 
+def _column_exists(table: str, column_name: str) -> bool:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    existing = {col["name"] for col in inspector.get_columns(table)}
+    return column_name in existing
+
+
 def upgrade() -> None:
-    op.add_column("jobs", sa.Column("error", sa.String(), nullable=True))
+    if not _column_exists("jobs", "error"):
+        op.add_column("jobs", sa.Column("error", sa.String(), nullable=True))
     op.execute("UPDATE jobs SET status='done' WHERE status='succeeded'")
     op.execute("UPDATE jobs SET status='failed' WHERE status='canceled'")
     op.execute("CREATE TYPE job_status_new AS ENUM ('queued','running','done','failed')")
@@ -35,4 +44,5 @@ def downgrade() -> None:
     )
     op.execute("DROP TYPE job_status")
     op.execute("ALTER TYPE job_status_old RENAME TO job_status")
-    op.drop_column("jobs", "error")
+    if _column_exists("jobs", "error"):
+        op.drop_column("jobs", "error")
