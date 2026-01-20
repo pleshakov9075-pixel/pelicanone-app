@@ -19,6 +19,9 @@ function App() {
   const devAuthEnabled = import.meta.env.VITE_DEV_AUTH === "true";
 
   useEffect(() => {
+    window.Telegram?.WebApp?.ready?.();
+    window.Telegram?.WebApp?.expand?.();
+
     const token = getAuthToken();
     if (token) {
       setAuthState("ready");
@@ -33,9 +36,6 @@ function App() {
         setAuthState("error");
         return;
       }
-      const tg = window.Telegram?.WebApp;
-      tg?.ready?.();
-      window.Telegram?.WebApp?.expand?.();
       apiFetch<{ access_token: string }>("/auth/telegram", {
         method: "POST",
         body: JSON.stringify({ initData })

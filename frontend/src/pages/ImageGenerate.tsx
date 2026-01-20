@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import {
+  DEV_AUTH_BYPASS_ENABLED,
+  getAuthToken,
+  hasTelegramInitData,
+  notifyMissingTelegramInitData
+} from "../api/client";
 import { createJob } from "../api/jobs";
 import { GenerationForm, GenerationParams } from "../components/GenerationForm";
 import { usePresets } from "../app/presets";
@@ -20,6 +26,14 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
   }, []);
 
   const handleSubmit = async (preset: Preset, data: GenerationParams) => {
+    const hasInitData = hasTelegramInitData();
+    const hasAuthToken = Boolean(getAuthToken());
+    if (!hasInitData && !DEV_AUTH_BYPASS_ENABLED && !hasAuthToken) {
+      notifyMissingTelegramInitData();
+      setError(ru.messages.telegramInitDataMissing);
+      setPhase("idle");
+      return;
+    }
     setError(null);
     setActiveEtaSeconds(preset.eta_seconds ?? null);
     setPhase("submitting");

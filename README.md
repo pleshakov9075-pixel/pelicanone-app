@@ -48,6 +48,26 @@ docker compose -f infra/docker-compose.yml logs -f worker
 
 Auth для Web режима отсутствует: авторизация осуществляется через Telegram/VK init data.
 
+### Авторизация Telegram WebApp
+
+- Во всех защищённых API запросах используется заголовок `X-Telegram-InitData` (значение `window.Telegram.WebApp.initData`). 
+- Если заголовок отсутствует, backend вернёт `401 telegram_initdata_missing`.
+- Если initData невалиден, backend вернёт `401 telegram_initdata_invalid`.
+
+#### DEV bypass (только для разработки)
+
+Включите, чтобы отлаживать API в обычном браузере без Telegram:
+
+```
+DEV_AUTH_BYPASS=true
+DEV_USER_PLATFORM_USER_ID=dev
+DEV_USER_ID=
+```
+
+> ⚠️ Используйте только в dev окружении.
+
+Для фронтенда можно включить `VITE_DEV_AUTH_BYPASS=true`, чтобы UI не блокировал отправку запросов без initData.
+
 ## Credits
 
 - 1 кредит = 1 рубль.

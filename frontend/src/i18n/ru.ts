@@ -71,6 +71,7 @@ export const ru = {
     authorizing: "Авторизация...",
     jobNotFound: "Задача не найдена",
     jobTimeout: "Задача выполняется слишком долго. Обновите статус или попробуйте позже.",
+    telegramInitDataMissing: "Откройте приложение в Telegram или включите DEV режим.",
     topupStub: "Платежи пока не подключены. Сейчас мок."
   },
   errors: {
