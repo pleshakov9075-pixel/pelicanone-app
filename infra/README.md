@@ -5,6 +5,8 @@
 ```bash
 cd /opt/pelicanone-app/infra
 docker compose down
+docker compose up -d db redis
+docker compose run --rm migrations
 docker compose up -d --build
 ```
 
@@ -54,6 +56,14 @@ curl -I https://ai.pelicanstudio.ru/.env  # 404
 curl -I https://ai.pelicanstudio.ru/assets/index-*.js | grep -i content-type
 curl -I https://ai.pelicanstudio.ru/media/ # 404 (листинг запрещён)
 curl -s https://ai.pelicanstudio.ru/api/v1/health
+```
+
+## Smoke-check (локально)
+
+```bash
+docker compose exec db psql -U pelican -d pelican -c "\\dt"
+curl http://localhost/api/v1/presets
+curl http://localhost/api/v1/health # optional
 ```
 
 Ожидаемые ответы:
