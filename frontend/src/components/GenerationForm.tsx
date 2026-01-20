@@ -49,11 +49,17 @@ export function GenerationForm({
   const [selectedPresetId, setSelectedPresetId] = useState(presets[0]?.id ?? "");
   const [values, setValues] = useState<Record<string, FieldValue>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showJson, setShowJson] = useState(false);
+  const [selectedJobType, setSelectedJobType] = useState(presets[0]?.job_type ?? "");
 
   const selectedPreset = useMemo(
     () => presets.find((preset) => preset.id === selectedPresetId),
     [presets, selectedPresetId]
   );
+
+  const jobTypes = useMemo(() => Array.from(new Set(presets.map((preset) => preset.job_type))), [
+    presets
+  ]);
 
   useEffect(() => {
     if (presets.length > 0 && !selectedPresetId) {
@@ -64,6 +70,7 @@ export function GenerationForm({
   useEffect(() => {
     if (selectedPreset) {
       setValues(buildInitialValues(selectedPreset.fields));
+      setSelectedJobType(selectedPreset.job_type);
     }
   }, [selectedPreset]);
 
@@ -77,10 +84,8 @@ export function GenerationForm({
     ? `Ожидание ~ ${formatDuration(selectedPreset.eta_seconds)}`
     : null;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const currentParams = useMemo(() => {
     const params: GenerationParams = {};
-
     selectedPreset.fields.forEach((field) => {
       const value = values[field.name];
       if (value === "" || value === undefined) {
@@ -88,8 +93,12 @@ export function GenerationForm({
       }
       params[field.name] = value as string | number | boolean;
     });
+    return params;
+  }, [selectedPreset.fields, values]);
 
-    onSubmit(selectedPreset, params);
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onSubmit(selectedPreset, currentParams);
   };
 
   const renderField = (field: PresetField) => {
@@ -193,6 +202,30 @@ export function GenerationForm({
 
   return (
     <form className="flex flex-col gap-4 rounded-lg border p-4" onSubmit={handleSubmit}>
+      {jobTypes.length > 1 ? (
+        <label className="flex flex-col gap-2">
+          <span>Тип генерации</span>
+          <select
+            className="rounded border p-2"
+            value={selectedJobType}
+            onChange={(event) => {
+              const nextType = event.target.value;
+              setSelectedJobType(nextType);
+              const nextPreset = presets.find((preset) => preset.job_type === nextType);
+              if (nextPreset) {
+                setSelectedPresetId(nextPreset.id);
+              }
+            }}
+          >
+            {jobTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
       <label className="flex flex-col gap-2">
         <span>Preset</span>
         <select
@@ -224,6 +257,26 @@ export function GenerationForm({
           ) : null}
         </div>
       ) : null}
+
+      <label className="flex flex-col gap-2">
+        <span>Референс (скоро)</span>
+        <input className="rounded border p-2" type="file" accept="image/*" />
+      </label>
+
+      <div>
+        <button
+          type="button"
+          className="text-sm text-blue-600"
+          onClick={() => setShowJson((prev) => !prev)}
+        >
+          {showJson ? "Скрыть JSON" : "JSON"}
+        </button>
+        {showJson ? (
+          <pre className="mt-2 whitespace-pre-wrap rounded border bg-slate-50 p-2 text-xs">
+            {JSON.stringify(currentParams, null, 2)}
+          </pre>
+        ) : null}
+      </div>
 
       <div className="flex flex-col gap-2">
         <Button type="submit">Сгенерировать</Button>

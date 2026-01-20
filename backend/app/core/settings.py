@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     )
     genapi_api_key: str = Field(default="", validation_alias="GENAPI_API_KEY")
 
+    media_dir: str = Field(default="/app/media", validation_alias="MEDIA_DIR")
+    media_base_url: str = Field(default="/media", validation_alias="MEDIA_BASE_URL")
+    media_ttl_seconds: int = Field(default=60 * 60 * 24, validation_alias="MEDIA_TTL_SECONDS")
+    media_cleanup_interval_seconds: int = Field(
+        default=10 * 60, validation_alias="MEDIA_CLEANUP_INTERVAL_SECONDS"
+    )
+
     credit_topup_packages: list[int] = [100, 300, 500]
 
 

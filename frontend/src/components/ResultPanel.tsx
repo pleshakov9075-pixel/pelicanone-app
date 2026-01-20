@@ -1,0 +1,114 @@
+import { useMemo, useState } from "react";
+import type { JobResultPayload, ResultItem } from "../api/jobs";
+import { Button } from "./ui/button";
+
+type ResultPanelProps = {
+  status?: string | null;
+  result?: JobResultPayload | null;
+  error?: string | null;
+  debug?: unknown;
+  isLoading?: boolean;
+};
+
+function pickText(items: ResultItem[]) {
+  return items.find((item) => item.kind === "text" && item.text);
+}
+
+function pickFile(items: ResultItem[]) {
+  return items.find((item) => item.kind === "file" && item.url);
+}
+
+export function ResultPanel({ status, result, error, debug, isLoading }: ResultPanelProps) {
+  const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const textItem = useMemo(() => (result ? pickText(result.items) : undefined), [result]);
+  const fileItem = useMemo(() => (result ? pickFile(result.items) : undefined), [result]);
+
+  const handleCopy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyStatus("Скопировано!");
+      setTimeout(() => setCopyStatus(null), 1500);
+    } catch {
+      setCopyStatus("Не удалось скопировать");
+    }
+  };
+
+  return (
+    <div className="flex h-full flex-col gap-4 rounded-lg border p-4">
+      <div className="flex items-center justify-between">
+        <div className="text-base font-semibold">Результат</div>
+        {status ? <div className="text-xs text-slate-500">Статус: {status}</div> : null}
+      </div>
+
+      {isLoading ? <div className="text-sm text-slate-500">Генерация в процессе...</div> : null}
+      {error ? <div className="text-sm text-red-500">{error}</div> : null}
+
+      {textItem?.text ? (
+        <div className="flex flex-col gap-2">
+          <textarea
+            className="min-h-[140px] w-full rounded border p-2 text-sm"
+            rows={6}
+            readOnly
+            value={textItem.text}
+          />
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Button type="button" onClick={() => handleCopy(textItem.text)}>
+              Copy
+            </Button>
+            {copyStatus ? <span className="text-xs text-slate-500">{copyStatus}</span> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {fileItem?.url ? (
+        <div className="flex flex-col gap-3">
+          {result?.type === "image" ? (
+            <img
+              className="max-h-80 w-full rounded border object-contain"
+              src={fileItem.url}
+              alt={fileItem.filename ?? "result"}
+            />
+          ) : null}
+          {result?.type === "video" ? (
+            <video className="max-h-80 w-full rounded border" controls src={fileItem.url} />
+          ) : null}
+          {result?.type === "audio" ? (
+            <audio className="w-full" controls src={fileItem.url} />
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <a
+              className="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-sm text-white"
+              href={fileItem.url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Открыть
+            </a>
+            <a
+              className="inline-flex items-center rounded border px-3 py-1 text-sm"
+              href={fileItem.url}
+              download={fileItem.filename ?? "result"}
+            >
+              Скачать
+            </a>
+            <Button type="button" onClick={() => handleCopy(fileItem.url)}>
+              Копировать ссылку
+            </Button>
+            {copyStatus ? <span className="text-xs text-slate-500">{copyStatus}</span> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {!textItem && !fileItem && !isLoading && !error ? (
+        <div className="text-sm text-slate-500">Результат появится после завершения генерации.</div>
+      ) : null}
+
+      {debug ? (
+        <details className="text-xs text-slate-500">
+          <summary className="cursor-pointer">Raw debug</summary>
+          <pre className="mt-2 whitespace-pre-wrap">{JSON.stringify(debug, null, 2)}</pre>
+        </details>
+      ) : null}
+    </div>
+  );
+}

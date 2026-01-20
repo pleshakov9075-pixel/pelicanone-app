@@ -6,7 +6,9 @@ import time
 import httpx
 
 from app.core.models.job import Job
+from app.core.media import cleanup_media_files, persist_result_files
 from app.core.presets import get_preset_polling_settings
+from app.core.settings import get_settings
 from app.db import async_session
 from app.providers.genapi.client import GenApiClient
 from app.providers.genapi.errors import GenApiRetryableError
@@ -45,7 +47,8 @@ async def _run_job_async(job_id: str) -> dict | None:
         try:
             result = await _execute_with_retry(client, job.type, job.payload)
             job.status = "succeeded"
-            result_payload = normalize_result(result)
+            result_payload = normalize_result(result, job.type)
+            result_payload = await persist_result_files(result_payload)
             job.result = result_payload
         except Exception as exc:  # pragma: no cover - fallback for unknown errors
             job.status = "failed"
@@ -143,3 +146,22 @@ def _fallback_timeout(job_type: str, payload: dict) -> int:
             return 1800
         return 900
     return DEFAULT_TIMEOUTS.get(job_type, 120)
+
+
+def cleanup_media() -> dict[str, int]:
+    payload = cleanup_media_files()
+    _schedule_next_cleanup()
+    return payload
+
+
+def _schedule_next_cleanup() -> None:
+    settings = get_settings()
+    from app.workers.rq import get_queue
+
+    queue = get_queue()
+    queue.enqueue_in(
+        dt.timedelta(seconds=settings.media_cleanup_interval_seconds),
+        cleanup_media,
+        job_id="cleanup_media",
+        result_ttl=0,
+    )

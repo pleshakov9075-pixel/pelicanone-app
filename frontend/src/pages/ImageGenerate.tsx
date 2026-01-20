@@ -1,43 +1,99 @@
-import { useEffect, useMemo, useState } from "react";
-import { createJob } from "../api/jobs";
+import { useEffect, useState } from "react";
+import { createJob, getJob, getJobResult, type JobResultPayload, type JobStatus } from "../api/jobs";
 import { GenerationForm, GenerationParams } from "../components/GenerationForm";
+import { ResultPanel } from "../components/ResultPanel";
 import { usePresets } from "../app/presets";
 import type { Preset } from "../api/presets";
 import { NavHandler } from "./types";
 
 export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
   const { presets, loading, error: presetsError } = usePresets();
+  const devEnabled = import.meta.env.VITE_DEV_AUTH === "true";
   const [error, setError] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<unknown | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
+  const [jobResult, setJobResult] = useState<JobResultPayload | null>(null);
+  const [resultError, setResultError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [isTimeout, setIsTimeout] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("last_job_result");
-    if (!stored) {
-      return;
-    }
-    try {
-      setLastResult(JSON.parse(stored));
-    } catch {
-      setLastResult(null);
+    setJobId(localStorage.getItem("last_job_id"));
+    const storedResult = localStorage.getItem("last_job_result");
+    if (storedResult) {
+      try {
+        setJobResult(JSON.parse(storedResult) as JobResultPayload);
+      } catch {
+        setJobResult(null);
+      }
     }
   }, []);
 
-  const resultDisplay = useMemo(() => {
-    if (!lastResult) {
-      return null;
+  useEffect(() => {
+    if (!jobId) {
+      return;
     }
-    if (typeof lastResult === "string") {
-      return { text: lastResult, files: [] };
-    }
-    if (typeof lastResult === "object" && lastResult !== null) {
-      const payload = lastResult as { text?: string; files?: string[] };
-      return { text: payload.text ?? "", files: payload.files ?? [] };
-    }
-    return null;
-  }, [lastResult]);
+    let timer: number | undefined;
+    let timeoutTimer: number | undefined;
+
+    const poll = async () => {
+      try {
+        setIsPolling(true);
+        const status = await getJob(jobId);
+        setJobStatus(status);
+        if (status.result) {
+          setJobResult(status.result);
+          localStorage.setItem("last_job_result", JSON.stringify(status.result));
+        }
+        if (status.status === "finished" || status.status === "failed") {
+          if (!status.result && status.status === "finished") {
+            const result = await getJobResult(jobId);
+            if (result.result) {
+              setJobResult(result.result as JobResultPayload);
+              localStorage.setItem("last_job_result", JSON.stringify(result.result));
+            }
+            if (result.error) {
+              setResultError(result.error);
+            }
+          }
+          if (timer) {
+            window.clearInterval(timer);
+          }
+          if (timeoutTimer) {
+            window.clearTimeout(timeoutTimer);
+          }
+          setIsPolling(false);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "error");
+      }
+    };
+
+    poll();
+    timer = window.setInterval(poll, 1500);
+    timeoutTimer = window.setTimeout(() => {
+      setIsTimeout(true);
+      if (timer) {
+        window.clearInterval(timer);
+      }
+      setIsPolling(false);
+    }, 2.5 * 60 * 1000);
+
+    return () => {
+      if (timer) {
+        window.clearInterval(timer);
+      }
+      if (timeoutTimer) {
+        window.clearTimeout(timeoutTimer);
+      }
+    };
+  }, [jobId]);
 
   const handleSubmit = async (preset: Preset, data: GenerationParams) => {
     setError(null);
+    setResultError(null);
+    setIsTimeout(false);
+    setJobResult(null);
     try {
       const job = await createJob({
         type: preset.job_type,
@@ -46,7 +102,8 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
           params: data
         }
       });
-      onNavigate("status");
+      setJobId(job.id);
+      setJobStatus({ status: "queued" });
       localStorage.setItem("last_job_id", job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "error");
@@ -65,42 +122,39 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
     <div className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">Генерация</h2>
       {error ? <div className="text-red-500">{error}</div> : null}
-      {presets.length === 0 ? (
-        <div>Пресеты не найдены</div>
-      ) : (
-        <GenerationForm presets={presets} onSubmit={handleSubmit} />
-      )}
-      <div className="rounded-lg border p-4">
-        <div className="mb-2 font-semibold">Результат</div>
-        {resultDisplay?.text ? (
-          <textarea
-            className="mt-2 w-full rounded border p-2 text-sm"
-            rows={6}
-            readOnly
-            value={resultDisplay.text}
-          />
-        ) : null}
-        {resultDisplay?.files && resultDisplay.files.length > 0 ? (
-          <div className="mt-2 flex flex-col gap-2">
-            <a className="text-blue-600" href={resultDisplay.files[0]} target="_blank" rel="noreferrer">
-              {resultDisplay.files[0]}
-            </a>
-            <a
-              className="inline-flex w-fit rounded bg-blue-600 px-3 py-1 text-white"
-              href={resultDisplay.files[0]}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Открыть
-            </a>
-          </div>
-        ) : null}
-        {!resultDisplay ? (
-          <div className="text-sm text-slate-500">
-            Результат появится после завершения последней генерации.
-          </div>
-        ) : null}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-4">
+          {presets.length === 0 ? (
+            <div>Пресеты не найдены</div>
+          ) : (
+            <GenerationForm presets={presets} onSubmit={handleSubmit} />
+          )}
+          {jobId ? (
+            <div className="rounded-lg border p-4 text-sm text-slate-500">
+              Последняя задача: {jobId}
+            </div>
+          ) : null}
+          {isTimeout ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Задача выполняется слишком долго. Обновите статус или попробуйте позже.
+            </div>
+          ) : null}
+        </div>
+        <ResultPanel
+          status={jobStatus?.status}
+          result={jobResult}
+          error={resultError}
+          isLoading={isPolling}
+          debug={
+            jobResult?.raw && devEnabled && localStorage.getItem("dev_mode") === "true"
+              ? jobResult.raw
+              : null
+          }
+        />
       </div>
+      <button className="text-blue-600" onClick={() => onNavigate("history")}>
+        К истории
+      </button>
     </div>
   );
 }

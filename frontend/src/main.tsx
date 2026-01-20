@@ -15,6 +15,7 @@ function App() {
   );
   const [platform, setPlatform] = useState<Platform>("web");
   const [devError, setDevError] = useState<string | null>(null);
+  const devAuthEnabled = import.meta.env.VITE_DEV_AUTH === "true";
 
   useEffect(() => {
     const token = getAuthToken();
@@ -31,6 +32,7 @@ function App() {
         setAuthState("error");
         return;
       }
+      window.Telegram?.WebApp?.expand?.();
       apiFetch<{ access_token: string }>("/auth/telegram", {
         method: "POST",
         body: JSON.stringify({ initData })
@@ -65,6 +67,16 @@ function App() {
   }
 
   if (authState === "dev" && platform === "web") {
+    if (!devAuthEnabled) {
+      return (
+        <div className="p-6">
+          <h1 className="text-xl font-semibold">PelicanOne 2.0</h1>
+          <p className="text-sm text-gray-500">
+            DEV режим отключён. Установите VITE_DEV_AUTH=true для тестирования.
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="p-6 space-y-4">
         <div>

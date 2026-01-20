@@ -8,6 +8,17 @@ docker compose down
 docker compose up -d --build
 ```
 
+## ENV
+
+Обязательные переменные:
+
+```
+MEDIA_DIR=/app/media
+MEDIA_BASE_URL=/media
+MEDIA_TTL_SECONDS=86400
+MEDIA_CLEANUP_INTERVAL_SECONDS=600
+```
+
 ## Проверка
 
 ```bash
@@ -17,6 +28,8 @@ curl -I http://ai.pelicanstudio.ru        # 301 -> https
 curl -I https://ai.pelicanstudio.ru       # 200
 curl -I https://ai.pelicanstudio.ru/.env  # 404
 curl -I https://ai.pelicanstudio.ru/assets/index-*.js | grep -i content-type
+curl -I https://ai.pelicanstudio.ru/media/ # 404 (листинг запрещён)
+curl -s https://ai.pelicanstudio.ru/api/v1/health
 ```
 
 Ожидаемые ответы:
@@ -24,12 +37,41 @@ curl -I https://ai.pelicanstudio.ru/assets/index-*.js | grep -i content-type
 - `http://ai.pelicanstudio.ru` возвращает редирект на `https`.
 - `https://ai.pelicanstudio.ru` возвращает `200`.
 - `https://ai.pelicanstudio.ru/.env` возвращает `404`.
+- `https://ai.pelicanstudio.ru/media/` возвращает `404`.
 
 ## Критерии приёмки
 
 - `ss -ltnp | grep -E ':80|:443'` — оба порта слушаются.
 - Chrome / Telegram WebView грузят JS и CSS без pending / reset.
 - Сертификат валиден (Let’s Encrypt).
+
+## Проверка media/cleanup
+
+1. Установить тестовый TTL (например, `MEDIA_TTL_SECONDS=60`).
+2. Сгенерировать файл через API.
+3. Проверить, что файл доступен по URL из результата:
+
+```bash
+curl -I https://ai.pelicanstudio.ru/media/<file_id>.<ext>
+```
+
+4. Подождать >60 секунд и убедиться, что файл удалён:
+
+```bash
+curl -I https://ai.pelicanstudio.ru/media/<file_id>.<ext> # 404
+```
+
+## Пример curl для jobs
+
+```bash
+TOKEN="<jwt>"
+curl -X POST https://ai.pelicanstudio.ru/api/v1/jobs \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"image","payload":{"network_id":"<network_id>","params":{"prompt":"test"}}}'
+
+curl -H "Authorization: Bearer ${TOKEN}" https://ai.pelicanstudio.ru/api/v1/jobs?mine=true
+```
 
 ## TLS (проверка)
 

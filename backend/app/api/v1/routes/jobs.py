@@ -66,14 +66,18 @@ async def get_job(
     user=Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    await _ensure_job_owner(job_id, user.id, session)
+    repo = JobRepository(session)
+    job = await repo.get_job(job_id)
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
     try:
         rq_job = _get_rq_job(str(job_id))
     except NoSuchJobError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found") from exc
     status_name = _map_rq_status(rq_job.get_status())
     error = rq_job.exc_info if status_name == "failed" else None
-    return JobStatusOut(status=status_name, error=error)
+    result = job.result if status_name == "finished" else None
+    return JobStatusOut(status=status_name, error=error, result=result, progress=None)
 
 
 @router.get("/{job_id}/result", response_model=JobResultOut)

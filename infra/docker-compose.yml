@@ -25,6 +25,8 @@ services:
       - redis
     ports:
       - "8000:8000"
+    volumes:
+      - media_data:/app/media
     restart: unless-stopped
 
   worker:
@@ -36,6 +38,8 @@ services:
       - db
       - redis
     command: ["sh", "-lc", "python -m app.workers.rq"]
+    volumes:
+      - media_data:/app/media
     restart: unless-stopped
 
   nginx:
@@ -51,7 +55,9 @@ services:
       - "443:443"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - media_data:/usr/share/nginx/media
     restart: unless-stopped
 
 volumes:
   db_data:
+  media_data:

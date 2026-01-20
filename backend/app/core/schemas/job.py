@@ -44,6 +44,8 @@ class JobStatusUpdate(BaseModel):
 class JobStatusOut(BaseModel):
     status: str
     error: str | None = None
+    result: dict[str, Any] | None = None
+    progress: float | None = None
 
 
 class JobResultOut(BaseModel):
