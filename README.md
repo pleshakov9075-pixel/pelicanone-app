@@ -27,6 +27,14 @@ Nginx: http://localhost
 make migrate
 ```
 
+### Docker Compose миграции
+
+```bash
+docker compose -f infra/docker-compose.yml up -d db redis
+docker compose -f infra/docker-compose.yml run --rm migrations
+docker compose -f infra/docker-compose.yml up -d --build
+```
+
 ## Worker
 
 ```bash

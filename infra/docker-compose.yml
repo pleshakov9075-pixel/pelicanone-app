@@ -29,6 +29,15 @@ services:
       - media_data:/app/media
     restart: unless-stopped
 
+  migrations:
+    build:
+      context: ../backend
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+    command: ["sh", "-lc", "alembic upgrade head"]
+
   worker:
     build:
       context: ../backend
