@@ -29,6 +29,7 @@ class Settings(BaseSettings):
         default="https://api.gen-api.ru/api/v1", validation_alias="GENAPI_BASE_URL"
     )
     genapi_api_key: str = Field(default="", validation_alias="GENAPI_API_KEY")
+    text_model: str = Field(default="gpt-5-2", validation_alias="TEXT_MODEL")
 
     media_dir: str = Field(default="/app/media", validation_alias="MEDIA_DIR")
     media_base_url: str = Field(default="/media", validation_alias="MEDIA_BASE_URL")

@@ -27,6 +27,12 @@ export type JobResult = {
   error?: string | null;
 };
 
+export type JobStatusResponse =
+  | { ok: true; status: JobStatus }
+  | { ok: false; statusCode: number; error: string };
+
+export type JobResultResponse = JobResult & { httpStatus: number };
+
 export type ResultItem = {
   kind: "file" | "text";
   url?: string;
@@ -52,11 +58,30 @@ export async function getJob(id: string) {
   return apiFetch<JobStatus>(`/jobs/${id}`);
 }
 
+export async function getJobStatus(id: string): Promise<JobStatusResponse> {
+  const headers = new Headers();
+  const token = getAuthToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  headers.set("Content-Type", "application/json");
+  const response = await fetch(`${API_BASE}/jobs/${id}`, { headers });
+  const text = await response.text();
+  if (!response.ok) {
+    return {
+      ok: false,
+      statusCode: response.status,
+      error: text || "request_failed"
+    };
+  }
+  return { ok: true, status: JSON.parse(text) as JobStatus };
+}
+
 export async function listJobs() {
   return apiFetch<{ items: Job[]; total: number }>("/jobs?mine=1");
 }
 
-export async function getJobResult(id: string): Promise<JobResult> {
+export async function getJobResult(id: string): Promise<JobResultResponse> {
   const headers = new Headers();
   const token = getAuthToken();
   if (token) {
@@ -77,8 +102,9 @@ export async function getJobResult(id: string): Promise<JobResult> {
     const errorMessage = payload.error ?? text;
     return {
       status: payload.status ?? "failed",
-      error: errorMessage || "request_failed"
+      error: errorMessage || "request_failed",
+      httpStatus: response.status
     };
   }
-  return payload;
+  return { ...payload, httpStatus: response.status };
 }

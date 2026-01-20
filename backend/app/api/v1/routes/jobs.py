@@ -34,6 +34,16 @@ def _map_rq_status(status_name: str) -> str:
     }.get(status_name, status_name)
 
 
+def _map_db_status(status_name: str) -> str:
+    return {
+        "queued": "queued",
+        "running": "started",
+        "succeeded": "finished",
+        "failed": "failed",
+        "canceled": "failed",
+    }.get(status_name, status_name)
+
+
 async def _ensure_job_owner(job_id: uuid.UUID, user_id: uuid.UUID, session: AsyncSession) -> None:
     repo = JobRepository(session)
     job = await repo.get_job(job_id)
@@ -72,8 +82,11 @@ async def get_job(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
     try:
         rq_job = _get_rq_job(str(job_id))
-    except NoSuchJobError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found") from exc
+    except NoSuchJobError:
+        status_name = _map_db_status(job.status)
+        error = None
+        result = job.result if status_name == "finished" else None
+        return JobStatusOut(status=status_name, error=error, result=result, progress=None)
     status_name = _map_rq_status(rq_job.get_status())
     error = rq_job.exc_info if status_name == "failed" else None
     result = job.result if status_name == "finished" else None
@@ -87,19 +100,31 @@ async def get_job_result(
     session: AsyncSession = Depends(get_session),
 ):
     await _ensure_job_owner(job_id, user.id, session)
+    repo = JobRepository(session)
+    job = await repo.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
     try:
         rq_job = _get_rq_job(str(job_id))
-    except NoSuchJobError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found") from exc
-    status_name = _map_rq_status(rq_job.get_status())
+        status_name = _map_rq_status(rq_job.get_status())
+        rq_error = rq_job.exc_info
+        rq_result = rq_job.result
+    except NoSuchJobError:
+        status_name = _map_db_status(job.status)
+        rq_error = None
+        rq_result = job.result
     if status_name == "failed":
+        error_detail = None
+        if isinstance(rq_result, dict):
+            error_detail = rq_result.get("error")
+        error_detail = error_detail or rq_error
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
-            content={"status": "failed", "error": rq_job.exc_info},
+            content={"status": "failed", "error": error_detail},
         )
     if status_name != "finished":
         return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": status_name})
-    return JobResultOut(status="finished", result=rq_job.result)
+    return JobResultOut(status="finished", result=rq_result)
 
 
 @router.get("", response_model=JobList)

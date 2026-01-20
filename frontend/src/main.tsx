@@ -34,7 +34,7 @@ function App() {
       }
       const tg = window.Telegram?.WebApp;
       tg?.ready?.();
-      tg?.expand?.();
+      window.Telegram?.WebApp?.expand?.();
       apiFetch<{ access_token: string }>("/auth/telegram", {
         method: "POST",
         body: JSON.stringify({ initData })

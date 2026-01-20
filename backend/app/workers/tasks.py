@@ -102,8 +102,12 @@ async def _execute_with_retry(client: GenApiClient, job_type: str, payload: dict
 
 def _submit_request(client: GenApiClient, job_type: str, payload: dict):
     if "network_id" in payload:
+        network_id = payload["network_id"]
+        if job_type == "text":
+            settings = get_settings()
+            network_id = settings.text_model
         params = _prepare_network_params(job_type, payload)
-        return client.submit_network(payload["network_id"], params)
+        return client.submit_network(network_id, params)
     return client.submit_function(
         payload.get("function_id", ""),
         payload.get("implementation", ""),
@@ -115,7 +119,6 @@ def _prepare_network_params(job_type: str, payload: dict) -> dict:
     params = payload.get("params") or {}
     if (
         job_type == "text"
-        and payload.get("network_id") == "grok-4-1"
         and "messages" not in params
         and "prompt" in params
     ):

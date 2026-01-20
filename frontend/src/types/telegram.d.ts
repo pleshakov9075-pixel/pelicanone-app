@@ -5,10 +5,8 @@ declare global {
     Telegram?: {
       WebApp?: {
         initData?: string;
-        expand?: () => void;
         ready?: () => void;
-        close?: () => void;
-        themeParams?: Record<string, string>;
+        expand?: () => void;
       };
     };
   }

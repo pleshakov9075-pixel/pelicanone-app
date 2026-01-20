@@ -50,6 +50,23 @@ cd /opt/pelicanone-app/infra
 docker compose build nginx
 ```
 
+## Smoke-check API jobs
+
+```bash
+TOKEN="<jwt>"
+
+curl -X POST https://ai.pelicanstudio.ru/api/v1/jobs \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"text","payload":{"network_id":"gpt-5-2","params":{"prompt":"test"}}}'
+
+curl -H "Authorization: Bearer ${TOKEN}" \
+  https://ai.pelicanstudio.ru/api/v1/jobs/<job_id>
+
+curl -H "Authorization: Bearer ${TOKEN}" \
+  https://ai.pelicanstudio.ru/api/v1/jobs/<job_id>/result
+```
+
 ## Критерии приёмки
 
 - `ss -ltnp | grep -E ':80|:443'` — оба порта слушаются.
