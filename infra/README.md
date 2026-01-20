@@ -3,53 +3,35 @@
 ## Запуск
 
 ```bash
-cd pelicanone-app/infra
+cd /opt/pelicanone-app/infra
+docker compose down
 docker compose up -d --build
 ```
 
 ## Проверка
 
 ```bash
+ss -ltnp | grep ':80'
 curl -I http://ai.pelicanstudio.ru
-curl -I https://ai.pelicanstudio.ru
-curl -I https://ai.pelicanstudio.ru/assets/<file>.js
-curl https://ai.pelicanstudio.ru/api/v1/health
+curl -I http://ai.pelicanstudio.ru/.env
 ```
 
 Ожидаемые ответы:
 
-- `http://ai.pelicanstudio.ru` возвращает `301` на `https://`.
-- `https://ai.pelicanstudio.ru` возвращает `200`.
-- `https://ai.pelicanstudio.ru/assets/<file>.js` возвращает `200`.
-- `/api/v1/health` возвращает `ok` (если в backend есть этот endpoint).
+- `http://ai.pelicanstudio.ru` возвращает `200`.
+- `http://ai.pelicanstudio.ru/.env` возвращает `404`.
 
-## Сертификаты
+## TLS (следующий шаг)
 
-Контейнер Nginx читает сертификаты с хоста read-only:
+1. Установить certbot на хосте и выпустить сертификат для `ai.pelicanstudio.ru`.
+2. После появления `/etc/letsencrypt/live/ai.pelicanstudio.ru`:
+   - добавить `443:443` в `ports` сервиса nginx;
+   - примонтировать `/etc/letsencrypt:/etc/letsencrypt:ro`;
+   - расширить `infra/nginx/nginx.conf` сервером `443 ssl http2`;
+   - настроить редирект с `80` на `443`.
+
+Команды будут такими:
 
 ```
-/etc/letsencrypt/live/ai.pelicanstudio.ru/fullchain.pem
-/etc/letsencrypt/live/ai.pelicanstudio.ru/privkey.pem
-```
-
-Если сертификаты лежат в другом месте, примонтируйте их в контейнер
-или обновите пути в `infra/nginx/nginx.conf`.
-
-## Критерии приёмки
-
-```bash
-ss -ltnp | grep -E ':80|:443'
-```
-
-```bash
-curl -I https://ai.pelicanstudio.ru/
-```
-
-```bash
-curl -I https://ai.pelicanstudio.ru/.env
-curl -I https://ai.pelicanstudio.ru/.env.production
-```
-
-```bash
-curl -I https://ai.pelicanstudio.ru/api/v1/health
+docker compose up -d --build
 ```
