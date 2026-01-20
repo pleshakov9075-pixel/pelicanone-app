@@ -6,7 +6,7 @@ export type Job = {
   status: string;
   provider: string;
   payload: Record<string, unknown>;
-  result?: Record<string, unknown> | null;
+  result?: JobResultPayload | null;
   cost: number;
   eta_seconds?: number | null;
   started_at?: string | null;
@@ -17,12 +17,28 @@ export type Job = {
 export type JobStatus = {
   status: string;
   error?: string | null;
+  result?: JobResultPayload | null;
+  progress?: number | null;
 };
 
 export type JobResult = {
   status: string;
   result?: unknown;
   error?: string | null;
+};
+
+export type ResultItem = {
+  kind: "file" | "text";
+  url?: string;
+  filename?: string;
+  content_type?: string;
+  text?: string;
+};
+
+export type JobResultPayload = {
+  type: "image" | "video" | "audio" | "text";
+  items: ResultItem[];
+  raw?: Record<string, unknown>;
 };
 
 export async function createJob(payload: { type: string; payload: Record<string, unknown> }) {
@@ -58,9 +74,10 @@ export async function getJobResult(id: string): Promise<JobResult> {
     }
   }
   if (!response.ok) {
+    const errorMessage = payload.error ?? text;
     return {
       status: payload.status ?? "failed",
-      error: payload.error ?? text || "request_failed"
+      error: errorMessage || "request_failed"
     };
   }
   return payload;

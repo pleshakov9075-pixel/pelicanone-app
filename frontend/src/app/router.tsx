@@ -40,7 +40,7 @@ export function AppRouter() {
 
   return (
     <PresetsContext.Provider value={{ presets, loading: loadingPresets, error: presetError }}>
-      <div className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 p-6">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 pb-[env(safe-area-inset-bottom)] pt-6">
         <header className="flex flex-wrap items-center gap-2">
           {Object.keys(routes).map((key) => (
             <Button key={key} onClick={() => setRoute(key as RouteKey)}>
