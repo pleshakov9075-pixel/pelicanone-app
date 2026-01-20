@@ -152,19 +152,4 @@ def _fallback_timeout(job_type: str, payload: dict) -> int:
 
 
 def cleanup_media() -> dict[str, int]:
-    payload = cleanup_media_files()
-    _schedule_next_cleanup()
-    return payload
-
-
-def _schedule_next_cleanup() -> None:
-    settings = get_settings()
-    from app.workers.rq import get_queue
-
-    queue = get_queue()
-    queue.enqueue_in(
-        dt.timedelta(seconds=settings.media_cleanup_interval_seconds),
-        cleanup_media,
-        job_id="cleanup_media",
-        result_ttl=0,
-    )
+    return cleanup_media_files()
