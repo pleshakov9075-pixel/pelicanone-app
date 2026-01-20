@@ -16,6 +16,7 @@ ss -ltnp | grep ':443'
 curl -I http://ai.pelicanstudio.ru        # 301 -> https
 curl -I https://ai.pelicanstudio.ru       # 200
 curl -I https://ai.pelicanstudio.ru/.env  # 404
+curl -I https://ai.pelicanstudio.ru/assets/index-*.js | grep -i content-type
 ```
 
 Ожидаемые ответы:
