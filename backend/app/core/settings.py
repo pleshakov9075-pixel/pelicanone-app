@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     telegram_bot_token: str = Field(default="", validation_alias="TELEGRAM_BOT_TOKEN")
     vk_app_secret: str = Field(default="", validation_alias="VK_APP_SECRET")
     dev_auth: bool = Field(default=False, validation_alias="DEV_AUTH")
+    dev_auth_bypass: bool = Field(default=False, validation_alias="DEV_AUTH_BYPASS")
+    dev_user_platform_user_id: str = Field(
+        default="dev", validation_alias="DEV_USER_PLATFORM_USER_ID"
+    )
+    dev_user_id: str | None = Field(default=None, validation_alias="DEV_USER_ID")
 
     genapi_base_url: str = Field(
         default="https://api.gen-api.ru/api/v1", validation_alias="GENAPI_BASE_URL"

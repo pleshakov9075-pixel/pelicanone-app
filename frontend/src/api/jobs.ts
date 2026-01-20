@@ -1,4 +1,4 @@
-import { apiFetch, API_BASE, getAuthToken } from "./client";
+import { apiFetch, API_BASE, buildApiHeaders } from "./client";
 
 export type Job = {
   id: string;
@@ -51,12 +51,7 @@ export async function createJob(payload: { type: string; payload: Record<string,
 }
 
 export async function getJobDetail(id: string): Promise<JobDetailResponse> {
-  const headers = new Headers();
-  const token = getAuthToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  headers.set("Content-Type", "application/json");
+  const headers = buildApiHeaders();
   const response = await fetch(`${API_BASE}/jobs/${id}`, { headers });
   const text = await response.text();
   if (!response.ok) {
@@ -74,12 +69,7 @@ export async function listJobs() {
 }
 
 export async function getJobResult(id: string): Promise<JobResultResponse> {
-  const headers = new Headers();
-  const token = getAuthToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  headers.set("Content-Type", "application/json");
+  const headers = buildApiHeaders();
   const response = await fetch(`${API_BASE}/jobs/${id}/result`, { headers });
   const text = await response.text();
   let payload: JobResult = { status: "unknown" };
