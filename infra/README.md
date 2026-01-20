@@ -12,26 +12,23 @@ docker compose up -d --build
 
 ```bash
 ss -ltnp | grep ':80'
+ss -ltnp | grep ':443'
 curl -I http://ai.pelicanstudio.ru
-curl -I http://ai.pelicanstudio.ru/.env
+curl -I https://ai.pelicanstudio.ru
+curl -I https://ai.pelicanstudio.ru/.env
 ```
 
 Ожидаемые ответы:
 
-- `http://ai.pelicanstudio.ru` возвращает `200`.
-- `http://ai.pelicanstudio.ru/.env` возвращает `404`.
+- `http://ai.pelicanstudio.ru` возвращает редирект на `https`.
+- `https://ai.pelicanstudio.ru` возвращает `200`.
+- `https://ai.pelicanstudio.ru/.env` возвращает `404`.
 
-## TLS (следующий шаг)
+## TLS (проверка)
 
-1. Установить certbot на хосте и выпустить сертификат для `ai.pelicanstudio.ru`.
-2. После появления `/etc/letsencrypt/live/ai.pelicanstudio.ru`:
-   - добавить `443:443` в `ports` сервиса nginx;
-   - примонтировать `/etc/letsencrypt:/etc/letsencrypt:ro`;
-   - расширить `infra/nginx/nginx.conf` сервером `443 ssl http2`;
-   - настроить редирект с `80` на `443`.
+1. Убедиться, что на хосте есть сертификаты в `/etc/letsencrypt/live/ai.pelicanstudio.ru`.
+2. Перезапустить стек:
 
-Команды будут такими:
-
-```
+```bash
 docker compose up -d --build
 ```
