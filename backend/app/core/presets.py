@@ -7,7 +7,7 @@ PRESET_DEFINITIONS: list[dict[str, Any]] = [
         "id": "text",
         "label": "Text",
         "job_type": "text",
-        "network_id": "grok-4-1",
+        "network_id": "gpt-5-2",
         "eta_seconds": 20,
         "poll_interval_seconds": 2.0,
         "timeout_seconds": 120,

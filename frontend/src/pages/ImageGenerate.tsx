@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { createJob, getJob, getJobResult, type JobResultPayload, type JobStatus } from "../api/jobs";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createJob,
+  getJobResult,
+  getJobStatus,
+  type JobResultPayload,
+  type JobStatus
+} from "../api/jobs";
 import { GenerationForm, GenerationParams } from "../components/GenerationForm";
 import { ResultPanel } from "../components/ResultPanel";
 import { usePresets } from "../app/presets";
@@ -9,13 +15,16 @@ import { NavHandler } from "./types";
 export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
   const { presets, loading, error: presetsError } = usePresets();
   const devEnabled = import.meta.env.VITE_DEV_AUTH === "true";
+  const [phase, setPhase] = useState<"idle" | "submitting" | "running" | "done" | "failed">(
+    "idle"
+  );
   const [error, setError] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
   const [jobResult, setJobResult] = useState<JobResultPayload | null>(null);
   const [resultError, setResultError] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
   const [isTimeout, setIsTimeout] = useState(false);
+  const isLoading = useMemo(() => ["submitting", "running"].includes(phase), [phase]);
 
   useEffect(() => {
     setJobId(localStorage.getItem("last_job_id"));
@@ -30,7 +39,7 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
   }, []);
 
   useEffect(() => {
-    if (!jobId) {
+    if (!jobId || phase !== "running") {
       return;
     }
     let timer: number | undefined;
@@ -38,15 +47,29 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
 
     const poll = async () => {
       try {
-        setIsPolling(true);
-        const status = await getJob(jobId);
+        const response = await getJobStatus(jobId);
+        if (!response.ok) {
+          if (response.statusCode === 404) {
+            if (timer) {
+              window.clearInterval(timer);
+            }
+            if (timeoutTimer) {
+              window.clearTimeout(timeoutTimer);
+            }
+            setJobStatus(null);
+            setPhase("idle");
+            return;
+          }
+          throw new Error(response.error);
+        }
+        const status = response.status;
         setJobStatus(status);
         if (status.result) {
           setJobResult(status.result);
           localStorage.setItem("last_job_result", JSON.stringify(status.result));
         }
         if (status.status === "finished" || status.status === "failed") {
-          if (!status.result && status.status === "finished") {
+          if (!status.result) {
             const result = await getJobResult(jobId);
             if (result.result) {
               setJobResult(result.result as JobResultPayload);
@@ -62,10 +85,11 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
           if (timeoutTimer) {
             window.clearTimeout(timeoutTimer);
           }
-          setIsPolling(false);
+          setPhase(status.status === "failed" ? "failed" : "done");
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "error");
+        setPhase("failed");
       }
     };
 
@@ -76,7 +100,7 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
       if (timer) {
         window.clearInterval(timer);
       }
-      setIsPolling(false);
+      setPhase("failed");
     }, 2.5 * 60 * 1000);
 
     return () => {
@@ -87,13 +111,15 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
         window.clearTimeout(timeoutTimer);
       }
     };
-  }, [jobId]);
+  }, [jobId, phase]);
 
   const handleSubmit = async (preset: Preset, data: GenerationParams) => {
     setError(null);
     setResultError(null);
     setIsTimeout(false);
     setJobResult(null);
+    setJobStatus(null);
+    setPhase("submitting");
     try {
       const job = await createJob({
         type: preset.job_type,
@@ -104,9 +130,11 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
       });
       setJobId(job.id);
       setJobStatus({ status: "queued" });
+      setPhase("running");
       localStorage.setItem("last_job_id", job.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "error");
+      setPhase("failed");
     }
   };
 
@@ -144,7 +172,7 @@ export function ImageGenerate({ onNavigate }: { onNavigate: NavHandler }) {
           status={jobStatus?.status}
           result={jobResult}
           error={resultError}
-          isLoading={isPolling}
+          isLoading={isLoading}
           debug={
             jobResult?.raw && devEnabled && localStorage.getItem("dev_mode") === "true"
               ? jobResult.raw

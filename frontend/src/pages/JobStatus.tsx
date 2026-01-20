@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { getJob, getJobResult, type JobResultPayload, type JobStatus } from "../api/jobs";
+import {
+  getJobResult,
+  getJobStatus,
+  type JobResultPayload,
+  type JobStatus
+} from "../api/jobs";
 import { NavHandler } from "./types";
 import { ResultPanel } from "../components/ResultPanel";
 
@@ -10,6 +15,7 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
   const [jobResult, setJobResult] = useState<JobResultPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resultError, setResultError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
   useEffect(() => {
     const storedJobId = localStorage.getItem("last_job_id");
@@ -28,7 +34,20 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
 
     const fetchJob = async () => {
       try {
-        const data = await getJob(jobId);
+        setIsPolling(true);
+        const response = await getJobStatus(jobId);
+        if (!response.ok) {
+          if (response.statusCode === 404) {
+            setError("Задача не найдена");
+            setIsPolling(false);
+            if (timer) {
+              window.clearInterval(timer);
+            }
+            return;
+          }
+          throw new Error(response.error);
+        }
+        const data = response.status;
         setJobStatus(data);
         if (data.result) {
           setJobResult(data.result);
@@ -38,9 +57,11 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
           if (timer) {
             window.clearInterval(timer);
           }
+          setIsPolling(false);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "error");
+        setIsPolling(false);
       }
     };
 
@@ -63,6 +84,10 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
     }
     const fetchResult = async () => {
       const result = await getJobResult(jobId);
+      if (result.httpStatus === 404) {
+        setError("Задача не найдена");
+        return;
+      }
       const payload = result.result as JobResultPayload | undefined;
       if (payload) {
         setJobResult(payload);
@@ -92,7 +117,7 @@ export function JobStatus({ onNavigate }: { onNavigate: NavHandler }) {
         status={jobStatus?.status}
         result={jobResult}
         error={resultError}
-        isLoading={jobStatus ? !["finished", "failed"].includes(jobStatus.status) : false}
+        isLoading={isPolling}
         debug={
           jobResult?.raw && devEnabled && localStorage.getItem("dev_mode") === "true"
             ? jobResult.raw
