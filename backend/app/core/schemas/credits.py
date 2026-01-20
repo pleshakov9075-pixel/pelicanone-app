@@ -19,3 +19,13 @@ class CreditBalance(BaseModel):
 class CreditLedgerList(BaseModel):
     items: list[CreditLedgerOut]
     total: int
+
+
+class AdminCreditAddRequest(BaseModel):
+    platform_user_id: int
+    amount: int
+
+
+class AdminCreditAddResponse(BaseModel):
+    platform_user_id: int
+    balance: int

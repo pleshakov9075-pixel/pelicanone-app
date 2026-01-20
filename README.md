@@ -49,9 +49,9 @@ Auth для Web режима отсутствует: авторизация ос
 
 ### Авторизация Telegram WebApp
 
-- Во всех защищённых API запросах используется заголовок `X-Telegram-InitData` (значение `window.Telegram.WebApp.initData`). 
-- Если заголовок отсутствует, backend вернёт `401 telegram_initdata_missing`.
-- Если initData невалиден, backend вернёт `401 telegram_initdata_invalid`.
+- Во всех защищённых API запросах используется заголовок `X-Telegram-Init-Data` (значение `window.Telegram.WebApp.initData`).
+- Если заголовок отсутствует, backend вернёт `401 Telegram initData is required. Open the app inside Telegram.`.
+- Если initData невалиден или просрочен, backend вернёт `401 Invalid Telegram initData signature.`.
 
 ## Credits
 
@@ -65,7 +65,7 @@ docker compose -f infra/docker-compose.yml exec backend \
   python -m app.cli.credits topup --telegram-id 123456 --amount 300 --reason "manual topup"
 ```
 
-Если задано `ADMIN_TELEGRAM_IDS=123,456`, то добавьте `--admin-id` из списка.
+Если задано `ADMIN_TG_IDS=123,456`, то добавьте `--admin-id` из списка.
 
 ### Проверка баланса
 
@@ -73,7 +73,7 @@ docker compose -f infra/docker-compose.yml exec backend \
 - Через API в окружении Telegram:
 
 ```bash
-curl -H "X-Telegram-InitData: <initData>" http://localhost/api/v1/credits/balance
+curl -H "X-Telegram-Init-Data: <initData>" http://localhost/api/v1/credits/balance
 ```
 
 ## GenAPI

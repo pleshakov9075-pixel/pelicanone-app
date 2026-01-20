@@ -2,7 +2,7 @@ import { getTelegramInitData } from "../adapters/telegram";
 
 export const API_BASE = "/api/v1";
 
-const TELEGRAM_INITDATA_HEADER = "X-Telegram-InitData";
+const TELEGRAM_INITDATA_HEADER = "X-Telegram-Init-Data";
 
 function hasInitDataValue(initData: string | null | undefined) {
   return Boolean(initData && initData.trim().length > 0);
