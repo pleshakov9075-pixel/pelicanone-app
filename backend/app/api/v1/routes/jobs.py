@@ -1,16 +1,44 @@
 import datetime as dt
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from redis import Redis
+from rq.job import Job, NoSuchJobError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import get_current_user, get_rq_queue
 from app.core.repositories.jobs import JobRepository
-from app.core.schemas import JobCreate, JobList, JobOut
+from app.core.schemas import JobCreate, JobList, JobOut, JobResultOut, JobStatusOut
 from app.core.services.jobs import JobService
+from app.core.settings import get_settings
 from app.db import get_session
 from app.workers.tasks import run_job
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+settings = get_settings()
+
+
+def _get_rq_job(job_id: str) -> Job:
+    redis = Redis.from_url(settings.redis_url)
+    return Job.fetch(job_id, connection=redis)
+
+
+def _map_rq_status(status_name: str) -> str:
+    return {
+        "queued": "queued",
+        "started": "started",
+        "finished": "finished",
+        "failed": "failed",
+        "deferred": "queued",
+        "scheduled": "queued",
+    }.get(status_name, status_name)
+
+
+async def _ensure_job_owner(job_id: uuid.UUID, user_id: uuid.UUID, session: AsyncSession) -> None:
+    repo = JobRepository(session)
+    job = await repo.get_job(job_id)
+    if not job or job.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
 
 
 @router.post("", response_model=JobOut, status_code=status.HTTP_201_CREATED)
@@ -28,21 +56,46 @@ async def create_job(
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    queue.enqueue(run_job, str(job.id))
+    queue.enqueue(run_job, str(job.id), result_ttl=86400)
     return job
 
 
-@router.get("/{job_id}", response_model=JobOut)
+@router.get("/{job_id}", response_model=JobStatusOut)
 async def get_job(
     job_id: uuid.UUID,
     user=Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    repo = JobRepository(session)
-    job = await repo.get_job(job_id)
-    if not job or job.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found")
-    return job
+    await _ensure_job_owner(job_id, user.id, session)
+    try:
+        rq_job = _get_rq_job(str(job_id))
+    except NoSuchJobError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found") from exc
+    status_name = _map_rq_status(rq_job.get_status())
+    error = rq_job.exc_info if status_name == "failed" else None
+    return JobStatusOut(status=status_name, error=error)
+
+
+@router.get("/{job_id}/result", response_model=JobResultOut)
+async def get_job_result(
+    job_id: uuid.UUID,
+    user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    await _ensure_job_owner(job_id, user.id, session)
+    try:
+        rq_job = _get_rq_job(str(job_id))
+    except NoSuchJobError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="job_not_found") from exc
+    status_name = _map_rq_status(rq_job.get_status())
+    if status_name == "failed":
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"status": "failed", "error": rq_job.exc_info},
+        )
+    if status_name != "finished":
+        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": status_name})
+    return JobResultOut(status="finished", result=rq_job.result)
 
 
 @router.get("", response_model=JobList)
