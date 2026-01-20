@@ -11,6 +11,8 @@ export const ru = {
     generation: "Генерация",
     result: "Результат",
     status: "Статус задачи",
+    jobDetails: "Статус и результат",
+    request: "Запрос",
     history: "История",
     balance: "Баланс"
   },
@@ -20,6 +22,7 @@ export const ru = {
     balance: "Баланс",
     topup: "Пополнить",
     copy: "Копировать",
+    copyJson: "Скопировать JSON",
     open: "Открыть",
     download: "Скачать",
     copyLink: "Копировать ссылку",
@@ -27,6 +30,10 @@ export const ru = {
     devLogin: "Войти (DEV)",
     json: "JSON",
     hideJson: "Скрыть JSON",
+    requestTab: "Запрос",
+    jsonRequestTab: "JSON запрос",
+    resultTab: "Результат",
+    jsonResultTab: "JSON ответ",
     showAdvanced: "Расширенные настройки",
     hideAdvanced: "Скрыть расширенные настройки",
     toHistory: "К истории",
@@ -43,6 +50,8 @@ export const ru = {
     waiting: "Ожидание",
     elapsed: "Прошло",
     remaining: "Осталось",
+    model: "Модель",
+    parameters: "Параметры",
     externalLink: "Внешняя ссылка",
     devMode: "DEV режим"
   },
@@ -73,10 +82,8 @@ export const ru = {
   statuses: {
     queued: "В очереди",
     running: "Выполняется",
-    finished: "Готово",
     done: "Готово",
     failed: "Ошибка",
-    canceled: "Отменено",
     unknown: "Неизвестно"
   },
   jobTypes: {

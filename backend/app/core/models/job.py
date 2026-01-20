@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.models.base import Base
 
 JOB_TYPES = ("text", "image", "video", "audio", "upscale", "edit")
-JOB_STATUSES = ("queued", "running", "succeeded", "failed", "canceled")
+JOB_STATUSES = ("queued", "running", "done", "failed")
 
 
 class Job(Base):
@@ -20,6 +20,7 @@ class Job(Base):
     provider: Mapped[str] = mapped_column(String(32), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error: Mapped[str | None] = mapped_column(String, nullable=True)
     cost: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=dt.datetime.utcnow, nullable=False
@@ -32,3 +33,11 @@ class Job(Base):
         onupdate=dt.datetime.utcnow,
         nullable=False,
     )
+
+    @property
+    def kind(self) -> str:
+        return self.type
+
+    @property
+    def params(self) -> dict:
+        return self.payload

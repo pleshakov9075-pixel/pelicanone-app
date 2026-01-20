@@ -5,7 +5,7 @@ import { ru } from "../i18n/ru";
 
 import { NavHandler } from "./types";
 
-export function History({ onNavigate: _onNavigate }: { onNavigate?: NavHandler }) {
+export function History({ onNavigate }: { onNavigate?: NavHandler }) {
   const [jobs, setJobs] = useState<Job[]>([]);
 
   useEffect(() => {
@@ -18,7 +18,11 @@ export function History({ onNavigate: _onNavigate }: { onNavigate?: NavHandler }
       {jobs.length === 0 ? <div>{ru.messages.noJobs}</div> : null}
       <div className="flex flex-col gap-2">
         {jobs.map((job) => (
-          <JobCard key={job.id} job={job} />
+          <JobCard
+            key={job.id}
+            job={job}
+            onSelect={(jobId) => onNavigate?.("job", { jobId })}
+          />
         ))}
       </div>
     </div>
