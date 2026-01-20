@@ -11,11 +11,15 @@ type ResultPanelProps = {
 };
 
 function pickText(items: ResultItem[]) {
-  return items.find((item) => item.kind === "text" && item.text);
+  return items.find(
+    (item): item is ResultItem & { text: string } => item.kind === "text" && !!item.text
+  );
 }
 
 function pickFile(items: ResultItem[]) {
-  return items.find((item) => item.kind === "file" && item.url);
+  return items.find(
+    (item): item is ResultItem & { url: string } => item.kind === "file" && !!item.url
+  );
 }
 
 export function ResultPanel({ status, result, error, debug, isLoading }: ResultPanelProps) {
@@ -60,7 +64,7 @@ export function ResultPanel({ status, result, error, debug, isLoading }: ResultP
         </div>
       ) : null}
 
-      {fileItem?.url ? (
+      {fileItem ? (
         <div className="flex flex-col gap-3">
           {result?.type === "image" ? (
             <img
