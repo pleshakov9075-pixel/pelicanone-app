@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AppRouter } from "./app/router";
 import { queryClient } from "./app/queryClient";
-import { getTelegramInitData, getTelegramWebApp, hasTelegramWebApp } from "./adapters/telegram";
+import { getTelegramWebApp } from "./adapters/telegram";
 import { ru } from "./i18n/ru";
 import "./styles/index.css";
 
@@ -12,21 +12,32 @@ function App() {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   useEffect(() => {
-    if (!hasTelegramWebApp()) {
-      setAuthState("missing");
-      return;
-    }
-    const tg = getTelegramWebApp();
-    tg?.ready?.();
-    tg?.expand?.();
+    let isReady = false;
 
-    const initData = getTelegramInitData();
-    setAuthState(initData ? "ready" : "missing");
+    const intervalId = window.setInterval(() => {
+      if (window.Telegram?.WebApp) {
+        const tg = getTelegramWebApp();
+        tg?.ready?.();
+        tg?.expand?.();
+        isReady = true;
+        setAuthState("ready");
+        window.clearInterval(intervalId);
+        window.clearTimeout(timeoutId);
+      }
+    }, 50);
+
+    const timeoutId = window.setTimeout(() => {
+      if (!isReady) {
+        setAuthState("missing");
+      }
+      window.clearInterval(intervalId);
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
+    };
   }, []);
-
-  if (authState === "loading") {
-    return <div className="p-6">{ru.messages.authorizing}</div>;
-  }
 
   const debugInfo = useMemo(() => {
     const tg = window.Telegram;
@@ -40,6 +51,10 @@ function App() {
       `location.href: ${window.location.href}`
     ].join("\n");
   }, []);
+
+  if (authState === "loading") {
+    return <div className="p-6">{ru.messages.authorizing}</div>;
+  }
 
   const handleCopyDebug = async () => {
     try {
