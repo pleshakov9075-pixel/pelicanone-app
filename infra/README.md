@@ -39,9 +39,10 @@ alembic upgrade head
 Обязательные переменные:
 
 ```
-FILES_STORAGE_PATH=/app/storage
+FILES_STORAGE_PATH=/app/media
 FILES_TTL_HOURS=24
 FILES_CLEANUP_INTERVAL_SECONDS=600
+ADMIN_API_KEY=change-me
 ```
 
 ## Проверка
