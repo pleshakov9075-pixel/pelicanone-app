@@ -1,13 +1,14 @@
 import asyncio
 import datetime as dt
 import logging
-import shutil
 import time
 from pathlib import Path
 
 import httpx
+from sqlalchemy import select
 
 from app.core.models.job import Job
+from app.core.models.upload import Upload
 from app.core.job_files import persist_result_files
 from app.core.presets import get_preset_polling_settings
 from app.core.repositories.credits import CreditRepository
@@ -168,42 +169,125 @@ def _fallback_timeout(job_type: str, payload: dict) -> int:
     return DEFAULT_TIMEOUTS.get(job_type, 120)
 
 
+def cleanup_storage() -> dict[str, int]:
+    return asyncio.run(_cleanup_storage_async())
+
+
 def cleanup_job_files() -> dict[str, int]:
-    return asyncio.run(_cleanup_job_files_async())
+    return cleanup_storage()
 
 
-async def _cleanup_job_files_async() -> dict[str, int]:
+async def _cleanup_storage_async() -> dict[str, int]:
     settings = get_settings()
-    storage_root = Path(settings.files_storage_path) / "jobs"
-    if not storage_root.exists():
-        return {"removed": 0}
-    now = time.time()
-    ttl_seconds = settings.files_ttl_hours * 3600
-    removed = 0
-    removed_job_ids: list[str] = []
-    for job_dir in storage_root.iterdir():
-        if not job_dir.is_dir():
-            continue
-        age = now - job_dir.stat().st_mtime
-        if age <= ttl_seconds:
-            continue
-        try:
-            shutil.rmtree(job_dir)
-            removed += 1
-            removed_job_ids.append(job_dir.name)
-        except FileNotFoundError:
-            continue
-
-    if not removed_job_ids:
-        return {"removed": 0}
+    storage_root = Path(settings.files_storage_path)
+    storage_root.mkdir(parents=True, exist_ok=True)
+    now = dt.datetime.utcnow()
+    removed_uploads = 0
+    removed_job_files = 0
+    freed_bytes = 0
+    logger.info("cleanup: start")
 
     async with async_session() as session:
-        for job_id in removed_job_ids:
-            job = await session.get(Job, job_id)
-            if job and job.result_files is not None:
+        expired_uploads = (
+            await session.execute(select(Upload).where(Upload.expires_at < now))
+        ).scalars().all()
+        for upload in expired_uploads:
+            removed_uploads += 1
+            removed, removed_size = _remove_file(
+                _resolve_storage_path(storage_root, upload.path),
+                storage_root,
+            )
+            if removed:
+                freed_bytes += removed_size
+            await session.delete(upload)
+
+        cutoff = now - dt.timedelta(days=settings.job_results_ttl_days)
+        expired_jobs = (
+            await session.execute(
+                select(Job).where(
+                    Job.status == "done",
+                    Job.updated_at < cutoff,
+                )
+            )
+        ).scalars().all()
+        for job in expired_jobs:
+            removed, removed_size = _remove_job_files(storage_root, job.result_files or [])
+            removed_job_files += removed
+            freed_bytes += removed_size
+            if job.result_files is not None:
                 job.result_files = None
+
         await session.commit()
-    return {"removed": removed}
+
+    freed_mb = round(freed_bytes / (1024 * 1024), 2)
+    logger.info(
+        "cleanup: removed_uploads=%s removed_job_files=%s freed_mb=%s",
+        removed_uploads,
+        removed_job_files,
+        freed_mb,
+    )
+    return {
+        "removed_uploads": removed_uploads,
+        "removed_job_files": removed_job_files,
+        "freed_bytes": freed_bytes,
+    }
+
+
+def _resolve_storage_path(storage_root: Path, path_value: str | None) -> Path | None:
+    if not path_value:
+        return None
+    path = Path(path_value)
+    if not path.is_absolute():
+        path = storage_root / path
+    try:
+        resolved = path.resolve()
+    except FileNotFoundError:
+        resolved = path
+    if storage_root not in resolved.parents and resolved != storage_root:
+        logger.warning("cleanup: skip path outside storage: %s", resolved)
+        return None
+    return resolved
+
+
+def _remove_file(path: Path | None, storage_root: Path) -> tuple[int, int]:
+    if not path:
+        return 0, 0
+    try:
+        if not path.exists() or not path.is_file():
+            return 0, 0
+        size = path.stat().st_size
+        path.unlink()
+        _cleanup_empty_parents(path.parent, storage_root)
+        return 1, size
+    except FileNotFoundError:
+        return 0, 0
+    except Exception as exc:  # pragma: no cover - best-effort cleanup
+        logger.warning("cleanup: failed to remove %s: %s", path, exc)
+        return 0, 0
+
+
+def _cleanup_empty_parents(path: Path, stop_at: Path) -> None:
+    current = path
+    while current != stop_at and stop_at in current.parents:
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
+
+
+def _remove_job_files(storage_root: Path, result_files: list[dict]) -> tuple[int, int]:
+    removed = 0
+    removed_bytes = 0
+    for item in result_files:
+        if not isinstance(item, dict):
+            continue
+        path_value = item.get("path") or item.get("filename")
+        file_path = _resolve_storage_path(storage_root, str(path_value) if path_value else None)
+        file_removed, removed_size = _remove_file(file_path, storage_root)
+        removed += file_removed
+        removed_bytes += removed_size
+    return removed, removed_bytes
 
 
 def _build_empty_result(job_type: str) -> dict:

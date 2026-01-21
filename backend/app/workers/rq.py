@@ -4,7 +4,7 @@ from redis import Redis
 from rq import Queue, Worker
 
 from app.core.settings import get_settings
-from app.workers.tasks import cleanup_job_files
+from app.workers.tasks import cleanup_storage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ def _schedule_cleanup(queue: Queue, conn: Redis) -> None:
         logger.info("cleanup scheduler disabled: interval=%s", interval_seconds)
         return
 
-    job_id = "cleanup_files"
+    job_id = "cleanup_storage"
     try:
         existing_job = scheduler.get_job(job_id)
     except AttributeError:
@@ -44,7 +44,7 @@ def _schedule_cleanup(queue: Queue, conn: Redis) -> None:
 
     scheduler.schedule(
         scheduled_time=dt.datetime.utcnow() + dt.timedelta(seconds=interval_seconds),
-        func=cleanup_job_files,
+        func=cleanup_storage,
         interval=interval_seconds,
         repeat=None,
         id=job_id,
