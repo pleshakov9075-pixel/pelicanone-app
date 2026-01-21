@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         default=60 * 60 * 24, validation_alias="TELEGRAM_INITDATA_TTL_SECONDS"
     )
     admin_tg_ids: str = Field(default="", validation_alias="ADMIN_TG_IDS")
+    admin_api_key: str = Field(default="", validation_alias="ADMIN_API_KEY")
 
     genapi_base_url: str = Field(
         default="https://api.gen-api.ru/api/v1", validation_alias="GENAPI_BASE_URL"
@@ -29,10 +30,16 @@ class Settings(BaseSettings):
     genapi_api_key: str = Field(default="", validation_alias="GENAPI_API_KEY")
     text_model: str = Field(default="gpt-5-2", validation_alias="TEXT_MODEL")
 
-    files_storage_path: str = Field(default="/app/storage", validation_alias="FILES_STORAGE_PATH")
+    files_storage_path: str = Field(default="/app/media", validation_alias="FILES_STORAGE_PATH")
     files_ttl_hours: int = Field(default=24, validation_alias="FILES_TTL_HOURS")
     files_cleanup_interval_seconds: int = Field(
         default=10 * 60, validation_alias="FILES_CLEANUP_INTERVAL_SECONDS"
+    )
+    media_dir: str = Field(default="/app/media", validation_alias="MEDIA_DIR")
+    media_base_url: str = Field(default="/media", validation_alias="MEDIA_BASE_URL")
+    media_ttl_seconds: int = Field(default=60 * 60 * 24, validation_alias="MEDIA_TTL_SECONDS")
+    media_cleanup_interval_seconds: int = Field(
+        default=10 * 60, validation_alias="MEDIA_CLEANUP_INTERVAL_SECONDS"
     )
 
     price_text_rub: int = Field(default=1, validation_alias="PRICE_TEXT_RUB")
