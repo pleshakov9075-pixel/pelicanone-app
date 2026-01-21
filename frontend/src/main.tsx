@@ -39,10 +39,6 @@ function App() {
     };
   }, []);
 
-  if (authState === "loading") {
-    return <div className="p-6">{ru.messages.authorizing}</div>;
-  }
-
   const debugInfo = useMemo(() => {
     const tg = window.Telegram;
     const webApp = window.Telegram?.WebApp;
@@ -55,6 +51,10 @@ function App() {
       `location.href: ${window.location.href}`
     ].join("\n");
   }, []);
+
+  if (authState === "loading") {
+    return <div className="p-6">{ru.messages.authorizing}</div>;
+  }
 
   const handleCopyDebug = async () => {
     try {
