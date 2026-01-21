@@ -33,7 +33,13 @@ class Settings(BaseSettings):
     files_storage_path: str = Field(default="/app/media", validation_alias="FILES_STORAGE_PATH")
     files_ttl_hours: int = Field(default=24, validation_alias="FILES_TTL_HOURS")
     files_cleanup_interval_seconds: int = Field(
-        default=10 * 60, validation_alias="FILES_CLEANUP_INTERVAL_SECONDS"
+        default=60 * 60 * 24, validation_alias="FILES_CLEANUP_INTERVAL_SECONDS"
+    )
+    upload_url_ttl_hours: int = Field(
+        default=48, validation_alias="UPLOAD_URL_TTL_HOURS"
+    )
+    job_results_ttl_days: int = Field(
+        default=7, validation_alias="JOB_RESULTS_TTL_DAYS"
     )
     media_dir: str = Field(default="/app/media", validation_alias="MEDIA_DIR")
     media_base_url: str = Field(default="/media", validation_alias="MEDIA_BASE_URL")
